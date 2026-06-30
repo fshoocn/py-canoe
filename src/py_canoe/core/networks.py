@@ -1,5 +1,6 @@
 import time
 from typing import Union, Optional
+from win32com.universal import com_error
 
 from py_canoe.helpers.common import logger
 from py_canoe.helpers.common import wait
@@ -110,6 +111,9 @@ class Networks:
             else:
                 logger.warning(f'No responses received for request: {request}')
                 return {"error": "No responses received"}
+        except com_error as e:
+            logger.error("Error sending diagnostic request: %s", e)
+            raise
         except Exception as e:
             logger.error(f"Error sending diagnostic request: {e}")
             return {"error": str(e)}

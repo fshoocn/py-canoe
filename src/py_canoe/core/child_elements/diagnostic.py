@@ -17,7 +17,7 @@ class Diagnostic:
             try:
                 request.SetParameter(key, value)
             except com_error:
-                logger.error("Failed to create parametrized diagnostic request due to %s attribute.", key)
+                logger.error(f"Failed to create parametrized diagnostic request due to {key} attribute.")
                 raise
         return DiagnosticRequest(request)
 
