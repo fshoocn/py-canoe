@@ -8,12 +8,11 @@ Python 🐍 Package for accessing Vector CANoe 🛶 Tool via COM Interface
 
 ## 🔗 useful links
 
-- [github documentation](https://chaitu-ycr.github.io/py-canoe/)
+- [documentation](https://chaitu-ycr.github.io/py-canoe/)
 - [pypi package](https://pypi.org/project/py-canoe/)
 - [github releases](https://github.com/chaitu-ycr/py-canoe/releases)
-- [for ideas💡/sugessions comment under discussions **here**](https://github.com/chaitu-ycr/py-canoe/discussions)
 - [create issue/request feature **here**](https://github.com/chaitu-ycr/py-canoe/issues/new/choose)
-- [fork repo](https://github.com/chaitu-ycr/py-canoe/fork) and create pull request to contribute back to this project.
+- [fork repo](https://github.com/chaitu-ycr/py-canoe/fork) and create pull request to contribute back to this project. or message me your GitHub username in LinkedIn to add you as collaborator.
 - [vector canoe documentation](https://help.vector.com/CANoeDEFamily/index.html)
 
 ## prerequisites
