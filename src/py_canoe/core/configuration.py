@@ -452,8 +452,35 @@ class Configuration:
         Returns:
             bool: True if the name matches the pattern.
         """
-        # Treat as regex if it starts with '(?' or contains regex-specific chars
-        if pattern.startswith('(?') or re.search(r'[\[\]{}+^$\\]', pattern):
+        # Treat as regex if it starts with '(?' or contains regex-specific syntax.
+        # Distinguish from fnmatch glob by inspecting bracket/brace contents:
+        #   - [...\d...] or [[:alpha:]] → regex (fnmatch doesn't support \d, POSIX classes)
+        #   - {3} or {1,3}             → regex quantifier (digits inside braces)
+        #   - {foo,bar}                → fnmatch alternation (commas inside braces)
+        is_regex = pattern.startswith('(?')
+        if not is_regex:
+            # Check for unambiguous regex markers outside bracket context
+            # (strip [...] and {...} first to avoid false positives from glob syntax)
+            stripped = re.sub(r'\[.*?\]', '', pattern)
+            stripped = re.sub(r'\{.*?\}', '', stripped)
+            if re.search(r'[+^$]|\\[dDwWsSbB]|\\\(|\\\{|\\\[' , stripped):
+                is_regex = True
+            # Check bracket contents for regex-specific escapes
+            # Use greedy match to handle nested brackets like [[:alpha:]]
+            for m in re.finditer(r'\[(.+)\]', pattern):
+                if re.search(r'\\[dDwWsSbB]|\[:\w+:\]', m.group(1)):
+                    is_regex = True
+                    break
+            # Check brace contents:
+            #   {3} or {1,3} → regex quantifier (digits, optionally with comma)
+            #   {foo,bar}    → fnmatch alternation (text with comma, Python fnmatch
+            #                  doesn't expand braces so it matches literally)
+            for m in re.finditer(r'\{([^}]+)\}', pattern):
+                content = m.group(1)
+                if re.match(r'^\d+$', content) or re.match(r'^\d+,\d*$', content):
+                    is_regex = True
+                    break
+        if is_regex:
             try:
                 return bool(re.search(pattern, name))
             except re.error:
