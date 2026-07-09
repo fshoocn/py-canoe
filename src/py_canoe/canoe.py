@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Iterable, Optional
+from typing import TYPE_CHECKING, Iterable, Optional, Sequence
 if TYPE_CHECKING:
     from py_canoe.core.child_elements.measurement_setup import Logging, ExporterSymbol, Message
     from py_canoe.core.child_elements.test_configurations import TestConfiguration
@@ -562,16 +562,64 @@ class CANoe:
         """
         return self.application.configuration.get_test_modules(env_name)
 
-    def execute_test_module(self, test_module_name: str) -> int:
+    def execute_test_module(self, test_module_name: str, enable_test_cases: Sequence[str] = (), disable_test_cases: Sequence[str] = ()) -> int:
         """use this method to execute test module.
 
         Args:
             test_module_name (str): test module name. avoid duplicate test module names in CANoe configuration.
+            enable_test_cases (Sequence[str]): Patterns of test cases to enable before execution.
+                Only matching test cases will be checked. Supports wildcard and regex:
+                - Wildcard: ``"*pass*"``, ``"TC_00?"``, ``"TC_[0-3]*"``
+                - Regex: ``"(?i)tc_001"``, ``"^SmokeTest_.*"``
+                If empty (default), no test cases are explicitly enabled.
+            disable_test_cases (Sequence[str]): Patterns of test cases to disable before execution.
+                Matching test cases will be unchecked. Takes precedence over enable_test_cases.
+                Supports the same wildcard and regex patterns as enable_test_cases.
+                If empty (default), no test cases are explicitly disabled.
 
         Returns:
             int: test module execution verdict. 0 ='VerdictNotAvailable', 1 = 'VerdictPassed', 2 = 'VerdictFailed',
+
+        Examples:
+            >>> # Enable only smoke test cases
+            >>> canoe.execute_test_module("MyModule", enable_test_cases=["SmokeTest_*"])
+
+            >>> # Disable slow test cases, enable everything else
+            >>> canoe.execute_test_module("MyModule", enable_test_cases=["*"], disable_test_cases=["*slow*", "*stress*"])
+
+            >>> # Use regex to match
+            >>> canoe.execute_test_module("MyModule", enable_test_cases=["(?i)^tc_(001|002|003)$"])
         """
-        return self.application.configuration.execute_test_module(test_module_name)
+        return self.application.configuration.execute_test_module(test_module_name, enable_test_cases, disable_test_cases)
+
+    def get_test_module_result(self, test_module_name: str) -> dict:
+        """Get test module execution result including report path and test case verdicts.
+
+        Should be called after execute_test_module() to retrieve the results.
+
+        Args:
+            test_module_name (str): test module name.
+
+        Returns:
+            dict: A dictionary with keys:
+                - "verdict" (int): overall test module verdict (0-5)
+                - "verdict_name" (str): human-readable verdict name
+                - "report" (dict): report information with keys:
+                    - "success" (bool): whether report generation succeeded
+                    - "source_full_name" (str): XML report path
+                    - "generated_full_name" (str): HTML report path
+                - "test_cases" (dict[str, dict]): mapping of test case names to dicts
+                  with keys "name", "enabled", "verdict", "verdict_name", "title"
+
+        Example:
+            >>> canoe.execute_test_module("MyModule")
+            >>> result = canoe.get_test_module_result("MyModule")
+            >>> print(f"Verdict: {result['verdict_name']}")
+            >>> print(f"Report: {result['report']['generated_full_name']}")
+            >>> for name, tc in result['test_cases'].items():
+            ...     print(f"  {name}: {tc['verdict_name']}")
+        """
+        return self.application.configuration.get_test_module_result(test_module_name)
 
     def stop_test_module(self, test_module_name: str):
         """stops execution of test module.

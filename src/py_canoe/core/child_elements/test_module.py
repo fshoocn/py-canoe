@@ -1,5 +1,6 @@
 import win32com.client
 
+from py_canoe.core.child_elements.test_case import TestCase
 from py_canoe.helpers.common import logger, wait, DoEventsUntil
 
 TEST_MODULE_START_EVENT_TIMEOUT = 5  # seconds
@@ -211,3 +212,146 @@ class TestModule:
 
     def set_execution_time(self, days: int, hours: int, minutes: int):
         self.com_object.SetExecutionTime(days, hours, minutes)
+
+    # --- Test Case Methods ---
+
+    @property
+    def test_sequence(self):
+        """Returns the TestSequence object of the test module.
+
+        The TestSequence contains test cases and test groups as a tree structure.
+        """
+        return self.com_object.TestSequence
+
+    def _collect_test_cases(self, sequence, test_cases: dict) -> dict:
+        """Recursively collect all TestCase objects from a TestSequence.
+
+        A TestSequence contains TestSequenceItem objects that can be either
+        TestCase or TestGroup. TestGroups contain nested TestSequences.
+        """
+        for index in range(1, sequence.Count + 1):
+            item = sequence.Item(index)
+            item_type = item.Type
+            if item_type == 5:  # TestCase
+                tc = TestCase(item)
+                test_cases[tc.name] = tc
+            elif item_type == 3:  # TestGroup
+                # Recurse into the test group's nested sequence
+                self._collect_test_cases(item.Sequence, test_cases)
+        return test_cases
+
+    def get_all_test_cases(self) -> dict[str, TestCase]:
+        """Returns all test cases in this test module as a dictionary.
+
+        Recursively traverses the test sequence tree to find all test cases,
+        including those nested inside test groups.
+
+        Note: TestCase data (e.g. Verdict) does not auto-update in CANoe.
+        Call this method again to get fresh data after test execution.
+
+        Returns:
+            dict[str, TestCase]: Dictionary mapping test case names to TestCase objects.
+
+        Example:
+            >>> test_cases = test_module.get_all_test_cases()
+            >>> for name, tc in test_cases.items():
+            ...     print(f"{name}: enabled={tc.enabled}, verdict={tc.verdict_name}")
+        """
+        test_cases = {}
+        try:
+            self._collect_test_cases(self.test_sequence, test_cases)
+        except Exception as e:
+            logger.error(f'Error fetching test cases for test module ({self.name}): {e}')
+        return test_cases
+
+    def get_test_case(self, test_case_name: str) -> TestCase | None:
+        """Returns a specific test case by name.
+
+        Args:
+            test_case_name (str): The name of the test case.
+
+        Returns:
+            TestCase | None: The TestCase object if found, None otherwise.
+        """
+        test_cases = self.get_all_test_cases()
+        if test_case_name in test_cases:
+            return test_cases[test_case_name]
+        else:
+            logger.warning(f'Test case "{test_case_name}" not found in test module ({self.name}).')
+            return None
+
+    def get_test_case_verdict(self, test_case_name: str) -> int:
+        """Returns the verdict of a specific test case.
+
+        Args:
+            test_case_name (str): The name of the test case.
+
+        Returns:
+            int: The verdict (0=NotAvailable, 1=Passed, 2=Failed, 3=None,
+                 4=Inconclusive, 5=ErrorInTestSystem). Returns -1 if not found.
+        """
+        tc = self.get_test_case(test_case_name)
+        if tc is not None:
+            return tc.verdict
+        return -1
+
+    def get_test_case_enabled(self, test_case_name: str) -> bool | None:
+        """Returns whether a specific test case is enabled.
+
+        Args:
+            test_case_name (str): The name of the test case.
+
+        Returns:
+            bool | None: True if enabled, False if disabled, None if not found.
+        """
+        tc = self.get_test_case(test_case_name)
+        if tc is not None:
+            return tc.enabled
+        return None
+
+    def set_test_case_enabled(self, test_case_name: str, enabled: bool) -> bool:
+        """Enable or disable a specific test case.
+
+        Note: This is only available for XML test modules.
+
+        Args:
+            test_case_name (str): The name of the test case.
+            enabled (bool): True to enable, False to disable.
+
+        Returns:
+            bool: True if successful, False if the test case was not found.
+        """
+        tc = self.get_test_case(test_case_name)
+        if tc is not None:
+            tc.enabled = enabled
+            logger.info(f'Test case "{test_case_name}" {"enabled" if enabled else "disabled"} in test module ({self.name}).')
+            return True
+        return False
+
+    def get_all_test_case_verdicts(self) -> dict[str, dict]:
+        """Returns verdict and enabled status for all test cases.
+
+        This is a convenience method that returns a snapshot of all test cases
+        with their current verdict and enabled state. Since TestCase data does
+        not auto-update, call this method again to refresh after test execution.
+
+        Returns:
+            dict[str, dict]: Dictionary mapping test case names to dicts with keys:
+                - "verdict" (int): The verdict value (0-5)
+                - "verdict_name" (str): Human-readable verdict name
+                - "enabled" (bool): Whether the test case is enabled
+
+        Example:
+            >>> verdicts = test_module.get_all_test_case_verdicts()
+            >>> for name, info in verdicts.items():
+            ...     print(f"{name}: {info['verdict_name']} (enabled={info['enabled']})")
+        """
+        result = {}
+        test_cases = self.get_all_test_cases()
+        for name, tc in test_cases.items():
+            result[name] = {
+                "verdict": tc.verdict,
+                "verdict_name": tc.verdict_name,
+                "enabled": tc.enabled
+            }
+        return result

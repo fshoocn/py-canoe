@@ -1,71 +1,69 @@
 # [py-canoe](https://github.com/chaitu-ycr/py-canoe)
 
-> 🇨🇳 [中文文档 / Chinese Documentation](README_CN.md)
+## 关于本包
 
-## about package
+Python 🐍 封装库，通过 COM 接口访问 Vector CANoe 🛶 工具
 
-Python 🐍 Package for accessing Vector CANoe 🛶 Tool via COM Interface
+> **注意：** 正在寻找志愿者来维护和贡献本项目。如有兴趣，请通过 [LinkedIn](https://www.linkedin.com/in/chaitu-ycr/) 联系我。
 
-> **Note:** Looking for volunteers to maintain and contribute to this project. If interested, please reach out to me on [LinkedIn](https://www.linkedin.com/in/chaitu-ycr/).
+## 🔗 实用链接
 
-## 🔗 useful links
+- [文档](https://chaitu-ycr.github.io/py-canoe/)
+- [PyPI 包](https://pypi.org/project/py-canoe/)
+- [GitHub 发布页](https://github.com/chaitu-ycr/py-canoe/releases)
+- [提交问题 / 请求功能](https://github.com/chaitu-ycr/py-canoe/issues/new/choose)
+- [Fork 仓库](https://github.com/chaitu-ycr/py-canoe/fork) 并创建 Pull Request 来贡献本项目，或在 LinkedIn 上发送你的 GitHub 用户名，我会将你添加为协作者。
+- [Vector CANoe 文档](https://help.vector.com/CANoeDEFamily/index.html)
 
-- [documentation](https://chaitu-ycr.github.io/py-canoe/)
-- [pypi package](https://pypi.org/project/py-canoe/)
-- [github releases](https://github.com/chaitu-ycr/py-canoe/releases)
-- [create issue/request feature **here**](https://github.com/chaitu-ycr/py-canoe/issues/new/choose)
-- [fork repo](https://github.com/chaitu-ycr/py-canoe/fork) and create pull request to contribute back to this project. or message me your GitHub username in LinkedIn to add you as collaborator.
-- [vector canoe documentation](https://help.vector.com/CANoeDEFamily/index.html)
+## 前提条件
 
-## prerequisites
+- [Python (>=3.10)](https://www.python.org/downloads/)
+- [Vector CANoe 软件 (>=v11)](https://www.vector.com/int/en/support-downloads/download-center/)
+- [Visual Studio Code](https://code.visualstudio.com/Download)
+- Windows PC（推荐 Windows 11 操作系统及 16GB 内存）
 
-- [python(>=3.10)](https://www.python.org/downloads/)
-- [vector canoe software(>=v11)](https://www.vector.com/int/en/support-downloads/download-center/)
-- [visual studio code](https://code.visualstudio.com/Download)
-- Windows PC(recommended windows 11 OS along with 16GB RAM)
+## 安装
 
-## installation
-
-### standard way
+### 标准方式
 
 ```bash
-# install py-canoe package
+# 安装 py-canoe 包
 pip install py-canoe
 
-# upgrade py-canoe package
+# 升级 py-canoe 包
 pip install py-canoe --upgrade
 
-# install py-canoe package with all optional dependencies
+# 安装 py-canoe 包及所有可选依赖
 pip install py-canoe[all]
 ```
 
-### using astral uv
+### 使用 Astral UV
 
 ```bash
-# install py-canoe package
+# 安装 py-canoe 包
 uv pip install py-canoe
 
-# upgrade py-canoe package
+# 升级 py-canoe 包
 uv pip install py-canoe --upgrade
 
-# install py-canoe package with all optional dependencies
+# 安装 py-canoe 包及所有可选依赖
 uv pip install py-canoe[all]
 
-# add py-canoe as dependency to your pyproject.toml
+# 将 py-canoe 添加为 pyproject.toml 的依赖
 uv add py-canoe
 
-# add py-canoe package with all optional dependencies in your pyproject.toml
+# 将 py-canoe 包及所有可选依赖添加到 pyproject.toml
 uv add py-canoe[all]
 
-# upgrade py-canoe package in your pyproject.toml
+# 升级 pyproject.toml 中的 py-canoe 包
 uv update py-canoe
 ```
 
 ---
 
-## example use cases
+## 使用示例
 
-### import CANoe module and create CANoe class object
+### 导入 CANoe 模块并创建 CANoe 类对象
 
 ```python
 from py_canoe import CANoe, wait
@@ -73,7 +71,7 @@ from py_canoe import CANoe, wait
 canoe_inst = CANoe()
 ```
 
-### open CANoe, start measurement, get version info, stop measurement and close canoe configuration
+### 打开 CANoe、启动测量、获取版本信息、停止测量并关闭配置
 
 ```python
 from py_canoe import CANoe, wait
@@ -87,7 +85,7 @@ canoe_inst.stop_measurement()
 canoe_inst.quit()
 ```
 
-### restart/reset running measurement
+### 重启/重置正在运行的测量
 
 ```python
 from py_canoe import CANoe, wait
@@ -100,7 +98,7 @@ canoe_inst.reset_measurement()
 canoe_inst.stop_ex_measurement()
 ```
 
-### open CANoe offline config and start/break/step/reset/stop measurement in offline mode
+### 打开 CANoe 离线配置，在离线模式下启动/暂停/单步/重置/停止测量
 
 ```python
 from py_canoe import CANoe, wait
@@ -116,7 +114,7 @@ canoe_inst.reset_measurement_in_offline_mode()
 canoe_inst.stop_measurement()
 ```
 
-### get/set CANoe measurement index
+### 获取/设置 CANoe 测量索引
 
 ```python
 from py_canoe import CANoe, wait
@@ -134,7 +132,7 @@ canoe_inst.reset_measurement()
 canoe_inst.stop_measurement()
 ```
 
-### save CANoe config to a different version with different name
+### 将 CANoe 配置另存为不同版本和名称
 
 ```python
 from py_canoe import CANoe, wait
@@ -145,7 +143,7 @@ canoe_inst.open(canoe_cfg=r'tests\demo_cfg\demo_dev.cfg')
 canoe_inst.save_configuration_as(path=r'tests\demo_cfg\demo_v10.cfg', major=10, minor=0, create_dir=True)
 ```
 
-### get CAN bus statistics of CAN channel 1
+### 获取 CAN 通道 1 的总线统计数据
 
 ```python
 from py_canoe import CANoe, wait
@@ -158,7 +156,7 @@ canoe_inst.get_can_bus_statistics(channel=1)
 canoe_inst.stop_measurement()
 ```
 
-### get/set bus signal value, check signal state and get signal full name
+### 获取/设置总线信号值、检查信号状态、获取信号全名
 
 ```python
 from py_canoe import CANoe, wait
@@ -176,7 +174,7 @@ sig_val = canoe_inst.get_signal_value(bus='CAN', channel=1, message='LightState'
 canoe_inst.stop_measurement()
 ```
 
-### clear write window / read text from write window / control write window output file
+### 清空写入窗口 / 读取写入窗口文本 / 控制写入窗口输出文件
 
 ```python
 from py_canoe import CANoe, wait
@@ -193,7 +191,7 @@ canoe_inst.stop_measurement()
 canoe_inst.disable_write_window_output_file()
 ```
 
-### switch between CANoe desktops
+### 切换 CANoe 桌面
 
 ```python
 from py_canoe import CANoe, wait
@@ -203,7 +201,7 @@ canoe_inst.open(canoe_cfg=r'tests\demo_cfg\demo_dev.cfg')
 canoe_inst.ui_activate_desktop('Configuration')
 ```
 
-### get/set system variable or define system variable
+### 获取/设置系统变量或定义系统变量
 
 ```python
 from py_canoe import CANoe, wait
@@ -226,7 +224,7 @@ sys_var_val = canoe_inst.get_system_variable_value('sys_demo::demo')
 canoe_inst.stop_measurement()
 ```
 
-### list system variable namespaces and variables
+### 列出系统变量命名空间和变量
 
 ```python
 from py_canoe import CANoe, wait
@@ -238,7 +236,7 @@ namespace_names = canoe_inst.application.system.get_all_namespace_names()
 variables = canoe_inst.application.system.get_all_variables_in_namespace('demo')
 ```
 
-### send diagnostic request, control tester present
+### 发送诊断请求、控制 Tester Present
 
 ```python
 from py_canoe import CANoe, wait
@@ -261,7 +259,7 @@ resp = canoe_inst.send_diag_request('Door', 'Variant_Coding_Write', False, Count
 canoe_inst.stop_measurement()
 ```
 
-### set replay block source file / control replay block start stop
+### 设置回放块源文件 / 控制回放块启停
 
 ```python
 from py_canoe import CANoe, wait
@@ -277,7 +275,7 @@ canoe_inst.control_replay_block(block_name='DemoReplayBlock', start_stop=False)
 canoe_inst.stop_measurement()
 ```
 
-### compile CAPL nodes with success check
+### 编译 CAPL 节点并检查编译结果
 
 ```python
 from py_canoe import CANoe, wait
@@ -285,17 +283,17 @@ from py_canoe import CANoe, wait
 canoe_inst = CANoe()
 canoe_inst.open(canoe_cfg=r'tests\demo_cfg\demo_dev.cfg')
 
-# Simple bool check
+# 简单布尔检查
 if canoe_inst.application.configuration.run_compilation():
-    print("Compilation OK")
+    print("编译成功")
 
-# Get detailed error information
+# 获取详细错误信息
 result = canoe_inst.application.configuration.get_compilation_result()
 if not result["success"]:
-    print(f"Compilation failed: {result['error']}")
+    print(f"编译失败: {result['error']}")
 ```
 
-### compile CAPL nodes and call capl function
+### 编译 CAPL 节点并调用 CAPL 函数
 
 ```python
 from py_canoe import CANoe, wait
@@ -310,7 +308,7 @@ canoe_inst.call_capl_function('hello_world')
 canoe_inst.stop_measurement()
 ```
 
-### execute test configuration test units
+### 执行测试配置中的测试单元
 
 ```python
 from py_canoe import CANoe, wait
@@ -324,7 +322,7 @@ canoe_inst.stop_test_configuration()
 canoe_inst.stop_measurement()
 ```
 
-### execute test setup test module / test environment
+### 执行测试设置中的测试模块 / 测试环境
 
 ```python
 from py_canoe import CANoe, wait
@@ -338,14 +336,14 @@ canoe_inst.execute_test_module('demo_test_node_002')
 canoe_inst.stop_measurement()
 ```
 
-### execute test module with selective test case enable/disable
+### 执行测试模块时选择性启用/禁用测试用例
 
-The `execute_test_module` method supports selectively enabling or disabling test cases before execution using wildcard or regex patterns.
+`execute_test_module` 方法支持在执行前通过通配符或正则表达式模式选择性地启用或禁用测试用例。
 
-**Pattern matching rules:**
-- **Wildcard** (default): uses fnmatch-style patterns (`*` matches everything, `?` matches a single character, `[seq]` matches any character in seq)
-- **Regex**: patterns starting with `(?` or containing regex metacharacters (`^`, `$`, `[`, `]`, `+`, `{`, `}`) are treated as regular expressions
-- **Priority**: `disable_test_cases` takes precedence over `enable_test_cases`
+**模式匹配规则：**
+- **通配符**（默认）：使用 fnmatch 风格的模式（`*` 匹配任意字符，`?` 匹配单个字符，`[seq]` 匹配序列中的任意字符）
+- **正则表达式**：以 `(?` 开头或包含正则元字符（`^`、`$`、`[`、`]`、`+`、`{`、`}`）的模式将被视为正则表达式
+- **优先级**：`disable_test_cases` 优先于 `enable_test_cases`
 
 ```python
 from py_canoe import CANoe, wait
@@ -355,19 +353,19 @@ canoe_inst.open(canoe_cfg=r'tests\demo_cfg\demo_dev.cfg')
 
 canoe_inst.start_measurement()
 
-# enable only smoke test cases (wildcard)
+# 仅启用冒烟测试用例（通配符）
 canoe_inst.execute_test_module('demo_test_node_002', enable_test_cases=["SmokeTest_*"])
 
-# disable slow/stress tests, enable everything else (wildcard)
+# 禁用慢速/压力测试，启用其余全部（通配符）
 canoe_inst.execute_test_module('demo_test_node_002', enable_test_cases=["*"], disable_test_cases=["*slow*", "*stress*"])
 
-# use regex to enable specific test cases by number
+# 使用正则表达式按编号启用特定测试用例
 canoe_inst.execute_test_module('demo_test_node_002', enable_test_cases=["(?i)^tc_(001|002|003)$"])
 
 canoe_inst.stop_measurement()
 ```
 
-### get test module result (report path + test case verdicts)
+### 获取测试模块结果（报告地址 + 测试用例判定）
 
 ```python
 from py_canoe import CANoe, wait
@@ -378,17 +376,17 @@ canoe_inst.open(canoe_cfg=r'tests\demo_cfg\demo_dev.cfg')
 canoe_inst.start_measurement()
 canoe_inst.execute_test_module('demo_test_node_002')
 
-# get result: report path + all test case verdicts
+# 获取结果：报告地址 + 所有测试用例判定
 result = canoe_inst.get_test_module_result('demo_test_node_002')
-print(f"Verdict: {result['verdict_name']}")
-print(f"Report: {result['report']['generated_full_name']}")
+print(f"判定结果: {result['verdict_name']}")
+print(f"测试报告: {result['report']['generated_full_name']}")
 for name, tc in result['test_cases'].items():
-    print(f"  {name}: {tc['verdict_name']} (enabled={tc['enabled']})")
+    print(f"  {name}: {tc['verdict_name']} (已启用={tc['enabled']})")
 
 canoe_inst.stop_measurement()
 ```
 
-### get/set environment variable value
+### 获取/设置环境变量值
 
 ```python
 from py_canoe import CANoe, wait
@@ -408,7 +406,7 @@ var_value = canoe_inst.get_environment_variable_value('data_var')
 canoe_inst.stop_measurement()
 ```
 
-### add/remove database
+### 添加/移除数据库
 
 ```python
 from py_canoe import CANoe, wait
@@ -417,13 +415,13 @@ canoe_inst = CANoe()
 canoe_inst.open(canoe_cfg=r"tests\demo_cfg\demo_conf_gen_db_setup.cfg")
 
 canoe_inst.start_measurement()
-# add database
+# 添加数据库
 canoe_inst.add_database(fr"{file_path}\demo_cfg\DBs\sample_databases\XCP.dbc", 'CAN1', 1)
-# remove database
-canoe_inst.remove_database(fr"{file_path}\demo_cfg\DBs\sample_databases\XCP.dbc", 1)
+# 移除数据库
+canoe_inst.remove_database(fr"{file_path}\demo_cfg\DBs\sample_databases\XCP.dbc', 1)
 ```
 
-### get configured network names
+### 获取已配置的网络名称
 
 ```python
 from py_canoe import CANoe, wait
@@ -434,7 +432,7 @@ canoe_inst.open(canoe_cfg=r'tests\demo_cfg\demo_dev.cfg')
 network_names = canoe_inst.application.networks.get_all_network_names()
 ```
 
-### get configured simulation buses and database paths
+### 获取已配置的仿真总线和数据库路径
 
 ```python
 from py_canoe import CANoe, wait
@@ -446,7 +444,7 @@ bus_names = canoe_inst.application.bus.get_simulation_bus_names()
 db_paths = canoe_inst.application.bus.get_simulation_database_paths()
 ```
 
-### start/stop online logging block
+### 启动/停止在线日志记录块
 
 ```python
 from py_canoe import CANoe, wait
@@ -455,105 +453,99 @@ canoe_inst = CANoe()
 canoe_inst.open(canoe_cfg=r"tests\demo_cfg\demo_online_setup.cfg")
 
 canoe_inst.start_measurement()
-# stop logging block
+# 停止日志记录块
 canoe_inst.start_stop_online_logging_block(fr'{demo_cfg_dir}\Logs\demo_online_setup_log.blf', start_stop=False)
 wait(2)
-# start logging block
+# 启动日志记录块
 canoe_inst.start_stop_online_logging_block(fr'{demo_cfg_dir}\Logs\demo_online_setup_log.blf', start_stop=True)
 ```
 
-### working with logging blocks
+### 操作日志记录块
 
 ```python
 from py_canoe import CANoe, wait
 
 canoe_inst = CANoe()
-# remove current logging blocks
+# 移除当前日志记录块
 for i in range(canoe_inst.logging_collection.count):
-    canoe_inst.remove_logging_block(1)  # iteration start from 1 and shifts after each delete
-# add a new block
-# define dest path with file format as asc, blf or other
-# may include field functions like {IncMeasurement}
+    canoe_inst.remove_logging_block(1)  # 索引从 1 开始，每次删除后索引会偏移
+# 添加新的日志记录块
+# 指定目标路径，文件格式支持 asc、blf 等
+# 可包含字段函数如 {IncMeasurement}
 full_path = "C:/sample_log_{IncMeasurement}.blf"
 canoe_inst.add_logging_block(full_path)
 canoe_inst.start_measurement()
 # ...
 canoe_inst.stop_measurement()
-# log should be fully generated at this point for you to analyze
-canoe_inst.set_configuration_modified(False)  # to avoid popup asking to save changes
+# 此时日志已完全生成，可供分析
+canoe_inst.set_configuration_modified(False)  # 避免弹出"保存更改"对话框
 canoe_inst.quit()
 ```
 
-### server/headless mode (no GUI interaction)
+### 服务器/无头模式（无 GUI 交互）
 
-By default, py-canoe uses COM event sinks (`WithEvents`) to receive notifications from CANoe
-(e.g., measurement started, measurement stopped). This works well for interactive desktop applications,
-but can cause issues in server environments:
+默认情况下，py-canoe 使用 COM 事件接收器（`WithEvents`）来接收 CANoe 的通知（如测量已启动、测量已停止）。这对交互式桌面应用程序工作良好，但在服务器环境中可能会出现问题。
 
-**The Problem:**
-- CANoe may reject COM calls with `RPC_E_CALL_REJECTED` when it's busy (e.g., during report generation)
-- Long-running server processes need robust error handling for these transient states
-- In some scenarios, Windows may show a "program is busy" dialog (reduced in recent versions)
+**问题描述：**
+- 当 CANoe 繁忙时（如正在生成报告），可能以 `RPC_E_CALL_REJECTED` 拒绝 COM 调用
+- 长时间运行的服务器进程需要对这些瞬态状态进行健壮的错误处理
+- 在某些场景下，Windows 可能会显示"程序忙"对话框（在较新版本中已减少）
 
-**The Solution:**
-Use the low-level `Application` class with `enable_events=False` to disable COM event sinks.
-py-canoe will use polling instead, which is more reliable for server/headless operation:
+**解决方案：**
+使用底层 `Application` 类并设置 `enable_events=False` 来禁用 COM 事件接收器。py-canoe 将改用轮询方式，这在服务器/无头操作中更加可靠：
 
 ```python
 from py_canoe.core.application import Application
 
-# Create instance without COM event sinks (uses polling instead)
+# 创建不使用 COM 事件接收器的实例（改用轮询）
 app = Application(enable_events=False)
 app.open(r'tests\demo_cfg\demo.cfg', visible=True, auto_save=True, prompt_user=False)
 
 app.measurement.start()
-# ... run your test ...
+# ... 运行测试 ...
 app.measurement.stop()
 app.quit()
 ```
 
-**Parameters explained:**
-- `enable_events=False`: Disables COM event sinks, uses polling to detect state changes
-- `timeout`: Available on `start()` and `stop()` methods (default: 30s) - maximum time to wait
+**参数说明：**
+- `enable_events=False`：禁用 COM 事件接收器，使用轮询检测状态变化
+- `timeout`：`start()` 和 `stop()` 方法可用（默认 30 秒）— 最大等待时间
 
-**Benefits:**
-- Reduced "program is busy" dialogs (internal COM proxy sharing)
-- Automatic retry when CANoe is temporarily busy (e.g., during report generation)
-- Safe for long-running server processes (REST APIs, MCP servers, scheduled tasks)
-- Configurable timeouts for all operations
+**优势：**
+- 减少"程序忙"对话框（内部 COM 代理共享）
+- CANoe 暂时繁忙时自动重试（如正在生成报告）
+- 对长时间运行的服务器进程安全（REST API、MCP 服务器、定时任务）
+- 所有操作均可配置超时时间
 
-**Switching configurations without restarting CANoe:**
+**无需重启 CANoe 即可切换配置：**
 
-Server applications often need to run tests with different CANoe configurations.
-Use `open_config()` to switch configurations while keeping CANoe running:
+服务器应用程序通常需要使用不同的 CANoe 配置运行测试。使用 `open_config()` 在保持 CANoe 运行的同时切换配置：
 
 ```python
-# CANoe is already running with a configuration
+# CANoe 已打开某个配置
 canoe_inst.open_config(r'tests\demo_cfg\another_config.cfg', timeout=60)
-# Now running with the new configuration
+# 现在已切换到新配置
 ```
 
-**Custom COM message pumping:**
+**自定义 COM 消息泵送：**
 
-For advanced use cases where you need to pump COM messages in your own wait loops:
+在需要在自定义等待循环中泵送 COM 消息的高级场景中：
 
 ```python
 import time
 
-# Custom wait loop with COM message pumping
+# 带 COM 消息泵送的自定义等待循环
 while not my_condition():
-    canoe_inst.pump_messages()  # Process pending COM messages
+    canoe_inst.pump_messages()  # 处理待处理的 COM 消息
     time.sleep(0.1)
 ```
 
-## Regenerating Generated Robot Library
+## 重新生成 Robot Framework 包装库
 
-The project includes a small generator that creates the Robot Framework Python
-library wrapper at `src/py_canoe/canoe_robot_lib.py`. Do not edit that file
-manually — it is auto-generated. To regenerate it run:
+本项目包含一个代码生成器，用于创建 `src/py_canoe/canoe_robot_lib.py` 中的 Robot Framework Python 库包装器。请勿手动编辑该文件——它是自动生成的。要重新生成，请运行：
 
 ```bash
 python -m py_canoe.helpers.gen_canoe_robot_lib
 ```
 
-The generated file includes a timestamp and generator metadata in its header.
+生成的文件头部包含时间戳和生成器元数据。
