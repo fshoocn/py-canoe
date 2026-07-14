@@ -1,4 +1,6 @@
 from typing import TYPE_CHECKING, Iterable, Sequence, Union
+
+from py_canoe.core.child_elements.test_module import TestModule
 if TYPE_CHECKING:
     from py_canoe.core.application import Application
     from py_canoe.core.child_elements.measurement_setup import Logging, ExporterSymbol, Message
@@ -53,6 +55,8 @@ class Configuration:
     def fetch_test_modules(self):
         for te_name, te_inst in self.__test_setup_environments.items():
             for tm_name, tm_inst in te_inst.get_all_test_modules().items():
+                # A TestSetupItem object that either can be a TSTestModule object or a TestSetupFolder object.
+                # TestSetupFolder有items，包含TestSetupItems
                 self.__test_modules.append({'name': tm_name, 'object': tm_inst, 'environment': te_name})
 
     def fetch_test_units(self):
@@ -489,42 +493,70 @@ class Configuration:
         # Otherwise use fnmatch wildcard matching
         return fnmatchcase(name, pattern)
 
-    def _apply_test_case_selection(self, tm_obj, enable_patterns: Sequence[str], disable_patterns: Sequence[str]) -> None:
+    def _apply_test_case_selection(self, tm_obj:TestModule, enable_patterns: Sequence[str], disable_patterns: Sequence[str], match_by: str = "name") -> None:
         """Apply test case enable/disable selections based on patterns.
 
-        Iterates all test cases in the test module and matches each name against
-        the given patterns. disable_patterns takes precedence over enable_patterns.
+        Iterates all test cases in the test module and matches each name (or
+        title, see ``match_by``) against the given patterns.
+        disable_patterns takes precedence over enable_patterns.
 
         Args:
             tm_obj: The TestModule COM object.
             enable_patterns: Patterns for test cases to enable.
             disable_patterns: Patterns for test cases to disable.
+            match_by: Which test case attribute to match the patterns against.
+                Either "name" (default) or "title".
         """
+        if match_by not in ("name", "title"):
+            logger.warning(f'Invalid match_by="{match_by}", falling back to "name".')
+            match_by = "name"
+
+        # Coerce a bare string into a single-element sequence. Passing a string
+        # (e.g. "XM_CSflash_FUNC_00*") would otherwise be iterated character by
+        # character, and the '*' character alone would match every test case.
+        if isinstance(enable_patterns, str):
+            enable_patterns = [enable_patterns]
+        if isinstance(disable_patterns, str):
+            disable_patterns = [disable_patterns]
+
         if not enable_patterns and not disable_patterns:
             return
 
-        from py_canoe.core.child_elements.test_module import TestModule as TestModuleWrapper
-        tm_wrapper = TestModuleWrapper(tm_obj)
-        all_test_cases = tm_wrapper.get_all_test_cases()
+        all_test_cases = tm_obj.get_all_test_cases()
 
         if not all_test_cases:
-            logger.warning(f'No test cases found in test module ({tm_wrapper.name}).')
+            logger.warning(f'No test cases found in test module ({tm_obj.name}).')
             return
 
+        # When matching by title, check up front whether any title is available.
+        # Many module types (e.g. CAPL test modules) do not expose a Title at
+        # all. If none of the cases have a title, warn once and fall back to
+        # matching by name for the whole module (avoids per-case log spam).
+        # if match_by == "title":
+        #     if not any(tc.title for tc in all_test_cases.values()):
+        #         logger.warning(
+        #             f'Test module "{tm_obj.name}" has no test case titles '
+        #             f'available; falling back to matching by name.'
+        #         )
+        #         match_by = "name"
+
         for tc_name, tc in all_test_cases.items():
+            # Match against the requested attribute (name or title).
+            # print(f"Checking test case: {tc_name}, title: {tc.title}, ident: {tc.ident}, enabled: {tc.enabled}, verdict: {tc.verdict_name}")
+            match_value = tc.title if match_by == "title" else tc.name
             should_enable = False
             should_disable = False
 
             # Check disable patterns first (higher priority)
             for pattern in disable_patterns:
-                if self._match_test_case_name(tc_name, pattern):
+                if self._match_test_case_name(match_value, pattern):
                     should_disable = True
                     break
 
             # Check enable patterns only if not already matched by disable
             if not should_disable:
                 for pattern in enable_patterns:
-                    if self._match_test_case_name(tc_name, pattern):
+                    if self._match_test_case_name(match_value, pattern):
                         should_enable = True
                         break
 
@@ -537,7 +569,7 @@ class Configuration:
                     tc.enabled = True
                     logger.info(f'Test case "{tc_name}" enabled by pattern match.')
 
-    def execute_test_module(self, test_module_name: str, enable_test_cases: Sequence[str] = (), disable_test_cases: Sequence[str] = ()) -> int:
+    def execute_test_module(self, test_module_name: str, enable_test_cases: Sequence[str] = (), disable_test_cases: Sequence[str] = (), match_by: str = "name") -> int:
         try:
             test_verdict = {0: 'NotAvailable',
                             1: 'Passed',
@@ -548,7 +580,7 @@ class Configuration:
             execution_result = 0
             tm_obj = self._find_test_module(test_module_name)
             if tm_obj is not None:
-                self._apply_test_case_selection(tm_obj, enable_test_cases, disable_test_cases)
+                self._apply_test_case_selection(tm_obj, enable_test_cases, disable_test_cases, match_by=match_by)
                 tm_obj.start()
                 tm_obj.wait_for_completion()
                 execution_result = tm_obj.verdict
@@ -558,7 +590,7 @@ class Configuration:
             logger.error(f'failed to execute test module. {e}')
             return 0
 
-    def _find_test_module(self, test_module_name: str):
+    def _find_test_module(self, test_module_name: str) -> TestModule:
         """Find a test module by name from the cached test modules list.
 
         Returns:

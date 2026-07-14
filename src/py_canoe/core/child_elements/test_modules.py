@@ -18,6 +18,8 @@ class TestModules:
     def fetch_test_modules(self) -> dict['str': 'TestModule']:
         test_modules = dict()
         for index in range(1, self.count + 1):
+            ## tm_inst 可能为2个类型，一个是LinSlaveConformanceTester，一个是TSTestModule
+            ## TODO 先只考虑转换为TSTestModule
             tm_inst = TestModule(self.com_object.Item(index))
             test_modules[tm_inst.name] = tm_inst
         return test_modules

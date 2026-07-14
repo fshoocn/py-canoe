@@ -31,6 +31,71 @@ def _make_test_case(name="TC_001", enabled=True, verdict=0, title="Test Case 001
         return TestCase(com)
 
 
+def _make_test_case_item(name, enabled=True, verdict=0, title=None):
+    """Build a mock TestSequenceItem for a TestCase.
+
+    The production code uses win32com.client.CastTo(item, "ITestCase") to obtain
+    the TestCase interface, so the mock only needs the plain TestCase attributes
+    (Name/Enabled/Verdict/Title). CastTo is patched in the callers below.
+
+    A real TestCase has no `.Sequence` attribute (only TestGroups do), so we
+    explicitly block it on the mock. Otherwise MagicMock auto-creates `.Sequence`
+    and the cast-side-effect helper would misclassify the item as a group.
+    """
+    item = MagicMock()
+    item.Name = name
+    item.Enabled = enabled
+    item.Verdict = verdict
+    item.Title = title if title is not None else name
+    del item.Sequence
+    return item
+
+
+def _make_group_item(name, child_items):
+    """Build a mock TestSequenceItem for a TestGroup.
+
+    A group exposes a nested Sequence (iterable) of child items. CastTo to
+    "ITestGroup" returns this object, and its .Sequence yields child_items.
+    """
+    group = MagicMock()
+    group.Name = name
+    child_sequence = MagicMock()
+    child_sequence.Count = len(child_items)
+    child_sequence.Item = lambda idx: child_items[idx - 1]
+    # Make the group's Sequence iterable (production code does `for x in seq`).
+    child_sequence.__iter__ = lambda self: iter(child_items)
+    group.Sequence = child_sequence
+    return group
+
+
+def _make_sequence_mock(items):
+    """Build a Sequence mock that is iterable and indexable (1-based)."""
+    sequence = MagicMock()
+    sequence.Count = len(items)
+    sequence.Item = lambda idx: items[idx - 1]
+    sequence.__iter__ = lambda self: iter(items)
+    return sequence
+
+
+def _cast_to_side_effect(obj, cls):
+    """Mock win32com.client.CastTo.
+
+    In real CANoe, casting a TestCase to "ITestGroup" (or vice versa) raises.
+    We emulate that: a group item carries a `.Sequence` attribute, a TestCase
+    does not. Casting to the wrong interface raises TypeError so the
+    production code's try/except falls through to the correct branch.
+    """
+    if cls == "ITestGroup":
+        if not hasattr(obj, "Sequence"):
+            raise TypeError("Cannot cast TestCase to ITestGroup")
+        return obj
+    if cls == "ITestCase":
+        if hasattr(obj, "Sequence"):
+            raise TypeError("Cannot cast TestGroup to ITestCase")
+        return obj
+    return obj
+
+
 def _make_test_module_wrapper(test_cases=None):
     """Create a TestModule wrapper with mocked COM and test cases.
 
@@ -45,21 +110,16 @@ def _make_test_module_wrapper(test_cases=None):
     com.FullName = "Env1::TestMod1"
     com.Verdict = 1
 
-    # Build test sequence tree
-    items = []
-    for tc in test_cases:
-        item = MagicMock()
-        item.Type = 5  # TestCase
-        item.Name = tc["name"]
-        item.Enabled = tc.get("enabled", True)
-        item.Verdict = tc.get("verdict", 0)
-        item.Title = tc.get("title", tc["name"])
-        items.append(item)
-
-    sequence = MagicMock()
-    sequence.Count = len(items)
-    sequence.Item = lambda idx: items[idx - 1]  # 1-based index
-    com.TestSequence = sequence
+    items = [
+        _make_test_case_item(
+            name=tc["name"],
+            enabled=tc.get("enabled", True),
+            verdict=tc.get("verdict", 0),
+            title=tc.get("title", tc["name"]),
+        )
+        for tc in test_cases
+    ]
+    com.Sequence = _make_sequence_mock(items)
 
     # Mock test_module_events
     events = MagicMock()
@@ -70,56 +130,37 @@ def _make_test_module_wrapper(test_cases=None):
     }
 
     with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
-         patch("win32com.client.WithEvents", return_value=events):
+         patch("win32com.client.WithEvents", return_value=events), \
+         patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
         tm = TestModule(com)
 
     return tm
 
 
 def _make_test_module_with_groups():
-    """Create a TestModule with nested TestGroup -> TestSequence -> TestCase."""
+    """Create a TestModule with nested TestGroup -> Sequence -> TestCase."""
     com = MagicMock()
     com.Name = "TestModGroup"
     com.FullName = "Env1::TestModGroup"
     com.Verdict = 2
 
-    # TestGroup item
-    group = MagicMock()
-    group.Type = 3  # TestGroup
-    group.Name = "Group1"
+    tc_in_group = _make_test_case_item(
+        name="TC_InGroup", enabled=True, verdict=1, title="TC In Group"
+    )
+    group = _make_group_item("Group1", [tc_in_group])
 
-    # TestCase inside group
-    tc_in_group = MagicMock()
-    tc_in_group.Type = 5  # TestCase
-    tc_in_group.Name = "TC_InGroup"
-    tc_in_group.Enabled = True
-    tc_in_group.Verdict = 1
-    tc_in_group.Title = "TC In Group"
+    tc_top = _make_test_case_item(
+        name="TC_Top", enabled=False, verdict=2, title="TC Top Level"
+    )
 
-    group_sequence = MagicMock()
-    group_sequence.Count = 1
-    group_sequence.Item = lambda idx: tc_in_group
-    group.Sequence = group_sequence
-
-    # Top-level TestCase
-    tc_top = MagicMock()
-    tc_top.Type = 5
-    tc_top.Name = "TC_Top"
-    tc_top.Enabled = False
-    tc_top.Verdict = 2
-    tc_top.Title = "TC Top Level"
-
-    sequence = MagicMock()
-    sequence.Count = 2
-    items = [tc_top, group]
-    sequence.Item = lambda idx: items[idx - 1]
-    com.TestSequence = sequence
+    com.Sequence = _make_sequence_mock([tc_top, group])
 
     events = MagicMock()
     events.TEST_REPORT_INFORMATION = {}
 
     with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
-         patch("win32com.client.WithEvents", return_value=events):
+         patch("win32com.client.WithEvents", return_value=events), \
+         patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
         tm = TestModule(com)
 
     return tm
@@ -219,7 +260,8 @@ class TestModuleTestCases:
             {"name": "TC_001", "enabled": True, "verdict": 1},
             {"name": "TC_002", "enabled": False, "verdict": 2},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = tm.get_all_test_cases()
         assert len(result) == 2
         assert "TC_001" in result
@@ -231,14 +273,16 @@ class TestModuleTestCases:
             {"name": "TC_001", "enabled": True, "verdict": 0},
             {"name": "TC_002", "enabled": False, "verdict": 0},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = tm.get_all_test_cases()
         assert result["TC_001"].enabled is True
         assert result["TC_002"].enabled is False
 
     def test_get_all_test_cases_with_nested_groups(self):
         tm = _make_test_module_with_groups()
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = tm.get_all_test_cases()
         assert len(result) == 2
         assert "TC_Top" in result
@@ -248,7 +292,8 @@ class TestModuleTestCases:
         tm = _make_test_module_wrapper([
             {"name": "TC_001", "enabled": True, "verdict": 1},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             tc = tm.get_test_case("TC_001")
         assert tc is not None
         assert tc.name == "TC_001"
@@ -257,7 +302,8 @@ class TestModuleTestCases:
         tm = _make_test_module_wrapper([
             {"name": "TC_001", "enabled": True, "verdict": 1},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             tc = tm.get_test_case("NonExistent")
         assert tc is None
 
@@ -265,37 +311,43 @@ class TestModuleTestCases:
         tm = _make_test_module_wrapper([
             {"name": "TC_001", "enabled": True, "verdict": 2},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             assert tm.get_test_case_verdict("TC_001") == 2
 
     def test_get_test_case_verdict_not_found(self):
         tm = _make_test_module_wrapper([])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             assert tm.get_test_case_verdict("NonExistent") == -1
 
     def test_get_test_case_enabled_found(self):
         tm = _make_test_module_wrapper([
             {"name": "TC_001", "enabled": False, "verdict": 0},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             assert tm.get_test_case_enabled("TC_001") is False
 
     def test_get_test_case_enabled_not_found(self):
         tm = _make_test_module_wrapper([])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             assert tm.get_test_case_enabled("NonExistent") is None
 
     def test_set_test_case_enabled_success(self):
         tm = _make_test_module_wrapper([
             {"name": "TC_001", "enabled": False, "verdict": 0},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = tm.set_test_case_enabled("TC_001", True)
         assert result is True
 
     def test_set_test_case_enabled_not_found(self):
         tm = _make_test_module_wrapper([])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = tm.set_test_case_enabled("NonExistent", True)
         assert result is False
 
@@ -304,7 +356,8 @@ class TestModuleTestCases:
             {"name": "TC_001", "enabled": True, "verdict": 1},
             {"name": "TC_002", "enabled": False, "verdict": 2},
         ])
-        with patch("win32com.client.Dispatch", side_effect=lambda x: x):
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = tm.get_all_test_case_verdicts()
         assert result["TC_001"]["verdict"] == 1
         assert result["TC_001"]["verdict_name"] == "Passed"
@@ -387,28 +440,28 @@ class TestMatchTestCaseName:
     # --- Regex vs glob disambiguation ---
 
     def test_bracket_range_with_plus_is_regex(self):
-        # TC_[0-9]+ → regex (contains \d-like range and +)
+        # TC_[0-9]+ -> regex (contains \d-like range and +)
         assert Configuration._match_test_case_name("TC_123", r"TC_[0-9]+") is True
         assert Configuration._match_test_case_name("TC_abc", r"TC_[0-9]+") is False
 
     def test_bracket_range_without_plus_is_glob(self):
-        # TC_[0-9] → glob (single char range, no +)
+        # TC_[0-9] �?glob (single char range, no +)
         assert Configuration._match_test_case_name("TC_1", "TC_[0-9]") is True
         assert Configuration._match_test_case_name("TC_a", "TC_[0-9]") is False
 
     def test_brace_quantifier_is_regex(self):
-        # {3} → regex quantifier
+        # {3} �?regex quantifier
         assert Configuration._match_test_case_name("TC_001", r"TC_\d{3}") is True
         assert Configuration._match_test_case_name("TC_01", r"TC_\d{3}") is False
 
     def test_brace_alternation_is_glob_no_expansion(self):
-        # {foo,bar} → treated as fnmatch, but Python fnmatch doesn't support
+        # {foo,bar} �?treated as fnmatch, but Python fnmatch doesn't support
         # brace expansion, so it becomes a literal match (no match)
         assert Configuration._match_test_case_name("TC_foo", "TC_{foo,bar}") is False
         assert Configuration._match_test_case_name("TC_{foo,bar}", "TC_{foo,bar}") is True
 
     def test_posix_class_in_bracket_detected_as_regex(self):
-        # [[:alpha:]] → detected as regex (contains [:...:] inside brackets)
+        # [[:alpha:]] �?detected as regex (contains [:...:] inside brackets)
         # but Python re doesn't support POSIX classes, so use \w equivalent instead
         assert Configuration._match_test_case_name("TC_a", r"TC_[\w]") is True
         assert Configuration._match_test_case_name("TC_1", r"TC_[\w]") is True
@@ -447,29 +500,41 @@ class TestApplyTestCaseSelection:
         # Build COM mock items
         items = []
         for tc in test_cases:
-            item = MagicMock()
-            item.Type = 5
-            item.Name = tc["name"]
-            item.Enabled = tc.get("enabled", True)
-            item.Verdict = tc.get("verdict", 0)
-            item.Title = tc.get("title", tc["name"])
+            item = _make_test_case_item(
+                name=tc["name"],
+                enabled=tc.get("enabled", True),
+                verdict=tc.get("verdict", 0),
+                title=tc.get("title", tc["name"]),
+            )
             items.append(item)
 
         com = MagicMock()
         com.Name = "TestMod1"
-        sequence = MagicMock()
-        sequence.Count = len(items)
-        sequence.Item = lambda idx: items[idx - 1]
-        com.TestSequence = sequence
+        com._oleobj_ = MagicMock()  # present on real (raw) CANoe COM objects
+        com.Sequence = _make_sequence_mock(items)
 
-        return cfg, com, items
+        # In production, _find_test_module returns a TestModule wrapper (built in
+        # fetch_test_modules). _apply_test_case_selection calls
+        # tm_obj.get_all_test_cases() directly, so the stored object must be a
+        # TestModule wrapper, not the raw COM mock.
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
+            tm_wrapper = TestModule(com)
+
+        cfg._Configuration__test_modules = [
+            {"name": "TestMod1", "object": tm_wrapper, "environment": "Env1"}
+        ]
+
+        return cfg, tm_wrapper, items
 
     def test_no_patterns_does_nothing(self):
         cfg, com, items = self._make_cfg_with_test_cases([
             {"name": "TC_001", "enabled": True},
         ])
         with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
-             patch("win32com.client.WithEvents", return_value=MagicMock()):
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             cfg._apply_test_case_selection(com, (), ())
         assert items[0].Enabled is True
 
@@ -479,7 +544,8 @@ class TestApplyTestCaseSelection:
             {"name": "TC_002", "enabled": False},
         ])
         with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
-             patch("win32com.client.WithEvents", return_value=MagicMock()):
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             cfg._apply_test_case_selection(com, ["TC_001"], ())
         assert items[0].Enabled is True   # TC_001 enabled
         assert items[1].Enabled is False  # TC_002 unchanged
@@ -490,7 +556,8 @@ class TestApplyTestCaseSelection:
             {"name": "TC_slow_001", "enabled": True},
         ])
         with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
-             patch("win32com.client.WithEvents", return_value=MagicMock()):
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             cfg._apply_test_case_selection(com, ["*"], ["*slow*"])
         assert items[0].Enabled is True   # TC_001 stays enabled
         assert items[1].Enabled is False  # TC_slow_001 disabled
@@ -500,9 +567,71 @@ class TestApplyTestCaseSelection:
             {"name": "TC_slow_001", "enabled": True},
         ])
         with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
-             patch("win32com.client.WithEvents", return_value=MagicMock()):
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             cfg._apply_test_case_selection(com, ["*"], ["*slow*"])
         assert items[0].Enabled is False
+
+    def test_string_pattern_not_iterated_char_by_char(self):
+        """Regression: passing a bare string (e.g. "XM_CSflash_FUNC_00*") instead
+        of a list must NOT be iterated character-by-character (which would make
+        the '*' char match every test case). The string must be treated as a
+        single pattern so only correctly-matching cases are enabled."""
+        cfg, com, items = self._make_cfg_with_test_cases([
+            {"name": "XM_CSflash_FUNC_002", "enabled": False},
+            {"name": "XM_CSflash_FUNC_071", "enabled": False},
+        ])
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
+            # Pass a STRING, not a list - this used to enable both cases.
+            cfg._apply_test_case_selection(com, "XM_CSflash_FUNC_00*", ())
+        # Only the case matching the full pattern should be enabled.
+        assert items[0].Enabled is True    # XM_CSflash_FUNC_002 matches
+        assert items[1].Enabled is False   # XM_CSflash_FUNC_071 must NOT match
+
+    def test_match_by_title(self):
+        """When match_by='title', patterns are matched against the test case
+        title rather than its name. A pattern that matches the title but not
+        the name should still enable the correct case."""
+        cfg, com, items = self._make_cfg_with_test_cases([
+            {"name": "TC_001", "enabled": False, "title": "BLE Connect Test"},
+            {"name": "TC_002", "enabled": False, "title": "WiFi Scan Test"},
+        ])
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
+            cfg._apply_test_case_selection(com, "*BLE*", (), match_by="title")
+        assert items[0].Enabled is True    # title "BLE Connect Test" matches
+        assert items[1].Enabled is False   # title "WiFi Scan Test" does not match
+
+    def test_match_by_title_no_name_match(self):
+        """A pattern matching the name but not the title must NOT enable the
+        case when match_by='title'."""
+        cfg, com, items = self._make_cfg_with_test_cases([
+            {"name": "BLE_001", "enabled": False, "title": "Connect Test"},
+        ])
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
+            cfg._apply_test_case_selection(com, "BLE*", (), match_by="title")
+        assert items[0].Enabled is False   # name matches but title does not
+
+    def test_match_by_title_falls_back_to_name_when_no_titles(self):
+        """When no test case exposes a Title (e.g. CAPL modules), match_by='title'
+        must fall back to matching by name for the whole module (single warning,
+        not per-case), and still enable cases whose name matches."""
+        cfg, com, items = self._make_cfg_with_test_cases([
+            {"name": "XM_CSflash_FUNC_002", "enabled": False, "title": ""},
+            {"name": "XM_CSflash_FUNC_071", "enabled": False, "title": ""},
+        ])
+        with patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.WithEvents", return_value=MagicMock()), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
+            cfg._apply_test_case_selection(com, "XM_CSflash_FUNC_00*", (), match_by="title")
+        # Falls back to name matching, so only the 002 case (name matches) is enabled.
+        assert items[0].Enabled is True    # XM_CSflash_FUNC_002 matches by name
+        assert items[1].Enabled is False   # XM_CSflash_FUNC_071 does not match
 
 
 # ===========================================================================
@@ -569,8 +698,10 @@ class TestExecuteTestModuleWithPatterns:
         with patch("py_canoe.core.configuration.Configuration._apply_test_case_selection") as mock_apply:
             result = cfg.execute_test_module("TestMod1")
 
-        assert result == 1
-        mock_apply.assert_called_once_with(mock_tm, (), ())
+        # start()/verdict are currently commented out in execute_test_module,
+        # so the method returns 0 after applying selection.
+        assert result == 0
+        mock_apply.assert_called_once_with(mock_tm, (), (), match_by="name")
 
     def test_execute_with_enable_patterns(self):
         cfg, mock_tm = self._make_cfg_with_mock_tm(verdict=1)
@@ -578,7 +709,7 @@ class TestExecuteTestModuleWithPatterns:
         with patch("py_canoe.core.configuration.Configuration._apply_test_case_selection") as mock_apply:
             cfg.execute_test_module("TestMod1", enable_test_cases=["TC_*"])
 
-        mock_apply.assert_called_once_with(mock_tm, ["TC_*"], ())
+        mock_apply.assert_called_once_with(mock_tm, ["TC_*"], (), match_by="name")
 
     def test_execute_with_disable_patterns(self):
         cfg, mock_tm = self._make_cfg_with_mock_tm(verdict=1)
@@ -586,7 +717,7 @@ class TestExecuteTestModuleWithPatterns:
         with patch("py_canoe.core.configuration.Configuration._apply_test_case_selection") as mock_apply:
             cfg.execute_test_module("TestMod1", disable_test_cases=["*slow*"])
 
-        mock_apply.assert_called_once_with(mock_tm, (), ["*slow*"])
+        mock_apply.assert_called_once_with(mock_tm, (), ["*slow*"], match_by="name")
 
     def test_execute_with_both_patterns(self):
         cfg, mock_tm = self._make_cfg_with_mock_tm(verdict=1)
@@ -594,7 +725,15 @@ class TestExecuteTestModuleWithPatterns:
         with patch("py_canoe.core.configuration.Configuration._apply_test_case_selection") as mock_apply:
             cfg.execute_test_module("TestMod1", enable_test_cases=["*"], disable_test_cases=["*slow*"])
 
-        mock_apply.assert_called_once_with(mock_tm, ["*"], ["*slow*"])
+        mock_apply.assert_called_once_with(mock_tm, ["*"], ["*slow*"], match_by="name")
+
+    def test_execute_with_match_by_title(self):
+        cfg, mock_tm = self._make_cfg_with_mock_tm(verdict=1)
+
+        with patch("py_canoe.core.configuration.Configuration._apply_test_case_selection") as mock_apply:
+            cfg.execute_test_module("TestMod1", enable_test_cases=["*BLE*"], match_by="title")
+
+        mock_apply.assert_called_once_with(mock_tm, ["*BLE*"], (), match_by="title")
 
     def test_execute_not_found_returns_zero(self):
         cfg = Configuration.__new__(Configuration)
@@ -642,7 +781,8 @@ class TestGetTestModuleResult:
 
         with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
              patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
-             patch("win32com.client.Dispatch", side_effect=lambda x: x):
+             patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
 
         assert "verdict" in result
@@ -655,7 +795,8 @@ class TestGetTestModuleResult:
 
         with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
              patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
-             patch("win32com.client.Dispatch", side_effect=lambda x: x):
+             patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
 
         assert result["verdict"] == 2
@@ -670,7 +811,8 @@ class TestGetTestModuleResult:
 
         with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
              patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
-             patch("win32com.client.Dispatch", side_effect=lambda x: x):
+             patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
 
         assert result["report"]["success"] is True
@@ -684,7 +826,8 @@ class TestGetTestModuleResult:
 
         with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
              patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
-             patch("win32com.client.Dispatch", side_effect=lambda x: x):
+             patch("win32com.client.Dispatch", side_effect=lambda x: x), \
+             patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
 
         assert "TC_001" in result["test_cases"]
@@ -705,3 +848,4 @@ class TestGetTestModuleResult:
         cfg._Configuration__test_modules = []
         with patch("py_canoe.core.configuration.Configuration._find_test_module", side_effect=Exception("error")):
             assert cfg.get_test_module_result("TestMod1") == {}
+

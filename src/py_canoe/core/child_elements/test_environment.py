@@ -59,6 +59,7 @@ class TestEnvironment:
                     self.update_all_test_setup_folders(tsfs_instance)
 
     def get_all_test_modules(self):
+        self.__all_test_modules.clear()
         self.update_all_test_setup_folders()
         self.__all_test_modules.update(self.__test_modules.fetch_test_modules())
         return self.__all_test_modules

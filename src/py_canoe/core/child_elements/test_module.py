@@ -216,12 +216,12 @@ class TestModule:
     # --- Test Case Methods ---
 
     @property
-    def test_sequence(self):
-        """Returns the TestSequence object of the test module.
+    def Sequence(self):
+        """Returns the Sequence object of the test module.
 
-        The TestSequence contains test cases and test groups as a tree structure.
+        The Sequence contains test cases and test groups as a tree structure.
         """
-        return self.com_object.TestSequence
+        return self.com_object.Sequence
 
     def _collect_test_cases(self, sequence, test_cases: dict) -> dict:
         """Recursively collect all TestCase objects from a TestSequence.
@@ -229,15 +229,15 @@ class TestModule:
         A TestSequence contains TestSequenceItem objects that can be either
         TestCase or TestGroup. TestGroups contain nested TestSequences.
         """
-        for index in range(1, sequence.Count + 1):
-            item = sequence.Item(index)
-            item_type = item.Type
-            if item_type == 5:  # TestCase
-                tc = TestCase(item)
+        for testSequenceItem in sequence:
+            try:
+                testGroup = win32com.client.CastTo(testSequenceItem, "ITestGroup")
+                if testGroup.Sequence.Count != 0:
+                    self._collect_test_cases(testGroup.Sequence, test_cases)
+            except:
+                testCase = win32com.client.CastTo(testSequenceItem, "ITestCase")
+                tc = TestCase(testCase)
                 test_cases[tc.name] = tc
-            elif item_type == 3:  # TestGroup
-                # Recurse into the test group's nested sequence
-                self._collect_test_cases(item.Sequence, test_cases)
         return test_cases
 
     def get_all_test_cases(self) -> dict[str, TestCase]:
@@ -259,7 +259,7 @@ class TestModule:
         """
         test_cases = {}
         try:
-            self._collect_test_cases(self.test_sequence, test_cases)
+            self._collect_test_cases(self.Sequence, test_cases)
         except Exception as e:
             logger.error(f'Error fetching test cases for test module ({self.name}): {e}')
         return test_cases

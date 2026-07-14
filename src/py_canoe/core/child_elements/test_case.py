@@ -20,6 +20,7 @@ class TestCase:
     }
 
     def __init__(self, com_object):
+        self.obj = com_object
         self.com_object = win32com.client.Dispatch(com_object)
 
     @property
@@ -29,8 +30,17 @@ class TestCase:
 
     @property
     def title(self) -> str:
-        """Returns the title of the test case. Introduced in CANoe v17."""
-        return self.com_object.Title
+        """Returns the title of the test case. Introduced in CANoe v17.
+
+        Some test modules (e.g. CAPL test modules, or CANoe versions / module
+        types that do not expose a title) raise AttributeError when accessing
+        Title. In that case we return an empty string so callers can fall back
+        to matching by name.
+        """
+        try:
+            return self.com_object.Title
+        except AttributeError:
+            return ""
 
     @property
     def ident(self) -> str:
@@ -68,7 +78,7 @@ class TestCase:
         to refresh the state (e.g. Verdict) after test execution.
         """
         try:
-            self.com_object = win32com.client.Dispatch(self.com_object)
+            self.com_object = win32com.client.Dispatch(self.obj)
             logger.info(f'Refreshed test case ({self.name}) data.')
         except Exception as e:
             logger.error(f'Error refreshing test case: {e}')
