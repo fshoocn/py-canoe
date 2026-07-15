@@ -1,5 +1,4 @@
 import time
-from datetime import datetime, timezone
 from typing import Optional, Union
 
 from py_canoe.core.child_elements.channels import Channels
@@ -10,7 +9,7 @@ from py_canoe.core.child_elements.replay_collection import ReplayCollection
 from py_canoe.core.child_elements.security_configuration import SecurityConfiguration
 from py_canoe.core.child_elements.signals import Signal
 from py_canoe.core.database_utils.db import fetch_database_info
-from py_canoe.exceptions import ConfigurationNotLoadedError
+from py_canoe.helpers.exceptions import ConfigurationNotLoadedError
 from py_canoe.helpers.common import logger, wait
 
 

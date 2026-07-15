@@ -1,7 +1,8 @@
 from pathlib import Path
 
+import win32com
 import win32com.client
-import win32com.client.gencache
+from win32com.client import gencache
 import pythoncom
 
 from py_canoe.core.bus import Bus
@@ -32,15 +33,12 @@ class ApplicationEvents:
 
 
 class Application:
-    """Main interface to CANoe via COM automation.
-
-    The Application class automatically registers an IMessageFilter that suppresses
-    'Server Busy' dialogs when CANoe is temporarily unable to process COM calls
-    (e.g., during report generation after measurement stop). Rejected calls are
-    retried automatically with exponential backoff up to 60 seconds.
+    """
+    Main interface to CANoe via COM automation.
     """
 
     def __init__(self, enable_events: bool = True) -> None:
+        self.CANOE_APP_NAME = "CANoe.Application"
         self._enable_events = enable_events
         self.bus_types = {'CAN': 1, 'J1939': 2, 'FLEXRAY': 3, 'TTP': 4, 'LIN': 5, 'MOST': 6, 'ETH': 7, 'Kline': 14}
         self.com_object = None
@@ -92,16 +90,8 @@ class Application:
 
     def _launch_application(self) -> None:
         try:
-            # We use gencache.EnsureDispatch to connect to the CANoe COM object.
-            # This is preferred over Dispatch or DispatchEx for a few reasons:
-            # 1. It connects to a running instance of CANoe if one exists, and
-            #    starts a new instance if one is not running. This is the desired
-            #    behavior for both attaching to an existing session and starting a new one.
-            # 2. It enables early binding by generating a static proxy in the gencache,
-            #    which can improve performance.
-            # DispatchEx is not used because it would always start a new instance,
-            # which is not what we want for the 'attach' functionality.
-            self.com_object = win32com.client.gencache.EnsureDispatch("CANoe.Application")
+            logger.info(f"pywin32 gencache path: {win32com.__gen_path__}")
+            self.com_object = gencache.EnsureDispatch(self.CANOE_APP_NAME)
             if self._enable_events:
                 self.application_events = win32com.client.WithEvents(self.com_object, ApplicationEvents)
             else:
@@ -109,9 +99,6 @@ class Application:
             self.measurement = Measurement(self, enable_events=self._enable_events)
             self.capl_function_objects = lambda: self.measurement.measurement_events.CAPL_FUNCTION_OBJECTS
             self.measurement.measurement_events.CAPL_FUNCTION_NAMES = self.user_capl_functions
-            # When attaching to an already-running CANoe instance that has a project
-            # loaded, initialize the configuration and related objects so callers don't
-            # receive None from self.configuration.
             if self.com_object.Configuration.FullName:
                 self._setup_post_configuration_loading()
         except Exception as e:

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 from py_canoe.core.child_elements.namespaces import Namespaces
 from py_canoe.core.child_elements.variables import Variables
 from py_canoe.core.system import System
-from py_canoe.exceptions import PyCanoeError, NamespaceNotFoundError
+from py_canoe.helpers.exceptions import PyCanoeError, NamespaceNotFoundError
 
 
 def _make_namespaces(names):

@@ -1,6 +1,6 @@
 [project]
 name = "py-canoe"
-version = "26.3.2"
+version = "26.3.3"
 description = "Python 🐍 Package for accessing Vector CANoe 🛶 Tool via COM Interface"
 license = { file = "LICENSE" }
 readme = "README.md"
@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 py-canoe = "py_canoe:main"
+gen-canoe-robot-lib = "py_canoe.helpers.gen_canoe_robot_lib:main"
 
 [project.optional-dependencies]
 robot = ["robotframework"]
