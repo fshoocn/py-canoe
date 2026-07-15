@@ -94,4 +94,4 @@ class TestCase:
         }
 
     def __repr__(self) -> str:
-        return f"TestCase(name='{self.name}', enabled={self.enabled}, verdict='{self.verdict_name}')"
+        return str(self.to_dict())

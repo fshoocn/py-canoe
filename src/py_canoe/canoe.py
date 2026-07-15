@@ -562,7 +562,7 @@ class CANoe:
         """
         return self.application.configuration.get_test_modules(env_name)
 
-    def execute_test_module(self, test_module_name: str, enable_test_cases: Sequence[str] = (), disable_test_cases: Sequence[str] = (), match_by: str = "name") -> int:
+    def execute_test_module(self, test_module_name: str, enable_test_cases: Sequence[str] = (), disable_test_cases: Sequence[str] = ()) -> int:
         """use this method to execute test module.
 
         Args:
@@ -576,15 +576,12 @@ class CANoe:
                 Matching test cases will be unchecked. Takes precedence over enable_test_cases.
                 Supports the same wildcard and regex patterns as enable_test_cases.
                 If empty (default), no test cases are explicitly disabled.
-            match_by (str): Which test case attribute the patterns are matched against.
-                Either "name" (default) or "title". Use "title" when your patterns
-                describe the test case title rather than its internal name.
 
         Returns:
             int: test module execution verdict. 0 ='VerdictNotAvailable', 1 = 'VerdictPassed', 2 = 'VerdictFailed',
 
         Examples:
-            >>> # Enable only smoke test cases (matched by name)
+            >>> # Enable only smoke test cases
             >>> canoe.execute_test_module("MyModule", enable_test_cases=["SmokeTest_*"])
 
             >>> # Disable slow test cases, enable everything else
@@ -592,11 +589,8 @@ class CANoe:
 
             >>> # Use regex to match
             >>> canoe.execute_test_module("MyModule", enable_test_cases=["(?i)^tc_(001|002|003)$"])
-
-            >>> # Match patterns against the test case title instead of name
-            >>> canoe.execute_test_module("MyModule", enable_test_cases=["*BLE*"], match_by="title")
         """
-        return self.application.configuration.execute_test_module(test_module_name, enable_test_cases, disable_test_cases, match_by=match_by)
+        return self.application.configuration.execute_test_module(test_module_name, enable_test_cases, disable_test_cases)
 
     def get_test_module_result(self, test_module_name: str) -> dict:
         """Get test module execution result including report path and test case verdicts.

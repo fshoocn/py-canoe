@@ -26,11 +26,11 @@ def setup_logger(name='py_canoe', filename='py_canoe.log'):
     # os.makedirs(os.path.dirname(filename), exist_ok=True)
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    fmt = "%(asctime)s [PY_CANOE] [%(levelname)-4.8s] %(message)s"
+    fmt = "%(asctime)s [PY_CANOE] [%(filename)s:%(lineno)d] [%(levelname)-4.8s] %(message)s"
     # Add console handler if not already present
     if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(logging.DEBUG)
         console_handler.setFormatter(logging.Formatter(fmt))
         logger.addHandler(console_handler)
     logger.propagate = False
@@ -46,7 +46,7 @@ def update_logger_file_path(logger: logging.Logger, log_dir_path: str | Path) ->
                 logger.removeHandler(handler)
                 handler.close()
         # Add new FileHandler
-        fmt = "%(asctime)s [PY_CANOE] [%(levelname)-4.8s] %(message)s"
+        fmt = "%(asctime)s [PY_CANOE] [%(filename)s:%(lineno)d] [%(levelname)-4.8s] %(message)s"
         file_handler = logging.FileHandler(new_filename, mode='w', encoding='utf-8')
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter(fmt))

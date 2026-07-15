@@ -38,6 +38,7 @@ class TestModuleEvents:
             "source_full_name": sourceFullName,
             "generated_full_name": generatedFullName
         }
+        logger.info(f"TestModuleVerdict: ({success}), sourceFullName: ({sourceFullName}), generatedFullName:({generatedFullName})")
         self.TM_REPORT_GENERATED = True
 
     def OnVerdictFail(self):

@@ -584,7 +584,7 @@ class Configuration:
                 tm_obj.start()
                 tm_obj.wait_for_completion()
                 execution_result = tm_obj.verdict
-                logger.info(f'test module "{test_module_name}" verdict = {test_verdict[execution_result]}')
+                logger.info(f'test module "{test_module_name}", verdict = {test_verdict[execution_result]}')
             return execution_result
         except Exception as e:
             logger.error(f'failed to execute test module. {e}')
@@ -622,35 +622,38 @@ class Configuration:
                   with keys "name", "enabled", "verdict", "verdict_name", "title"
         """
         try:
-            from py_canoe.core.child_elements.test_module import TestModule as TestModuleWrapper
             tm_obj = self._find_test_module(test_module_name)
             if tm_obj is None:
                 return {}
-            tm_wrapper = TestModuleWrapper(tm_obj)
+            
+            if tm_obj.test_module_events.TM_STARTED:
+                while not tm_obj.test_module_events.TM_REPORT_GENERATED:
+                    wait(0.01)
+                    
+                # overall verdict
+                verdict = tm_obj.verdict
+                verdict_name = tm_obj.VALUE_TABLE_VERDICT.get(verdict, "Unknown")
 
-            # overall verdict
-            verdict = tm_obj.Verdict
-            verdict_name = tm_wrapper.VALUE_TABLE_VERDICT.get(verdict, "Unknown")
+                # report information from event sink
+                report_info = tm_obj.test_module_events.TEST_REPORT_INFORMATION
+                report = {
+                    "success": report_info.get("success", False),
+                    "source_full_name": report_info.get("source_full_name", ""),
+                    "generated_full_name": report_info.get("generated_full_name", ""),
+                }
 
-            # report information from event sink
-            report_info = tm_wrapper.test_module_events.TEST_REPORT_INFORMATION
-            report = {
-                "success": report_info.get("success", False),
-                "source_full_name": report_info.get("source_full_name", ""),
-                "generated_full_name": report_info.get("generated_full_name", "")
-            }
+                test_cases = tm_obj.get_all_test_cases()
 
-            # test case results
-            test_cases = {}
-            for name, tc in tm_wrapper.get_all_test_cases().items():
-                test_cases[name] = tc.to_dict()
+                return {
+                    "verdict": verdict,
+                    "verdict_name": verdict_name,
+                    "report": report,
+                    "test_cases": test_cases
+                }
+            else:
+                logger.warning(f'Test Module ({self.name}) is not started. Start the Test Module first.')
+                return {}
 
-            return {
-                "verdict": verdict,
-                "verdict_name": verdict_name,
-                "report": report,
-                "test_cases": test_cases
-            }
         except Exception as e:
             logger.error(f'failed to get test module result for "{test_module_name}": {e}')
             return {}
