@@ -30,7 +30,7 @@ def setup_logger(name='py_canoe', filename='py_canoe.log'):
     # Add console handler if not already present
     if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
+        console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(logging.Formatter(fmt))
         logger.addHandler(console_handler)
     logger.propagate = False

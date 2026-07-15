@@ -235,10 +235,20 @@ class TestModule:
                 testGroup = win32com.client.CastTo(testSequenceItem, "ITestGroup")
                 if testGroup.Sequence.Count != 0:
                     self._collect_test_cases(testGroup.Sequence, test_cases)
-            except:
-                testCase = win32com.client.CastTo(testSequenceItem, "ITestCase")
-                tc = TestCase(testCase)
-                test_cases[tc.name] = tc
+            except Exception as e:
+                # Not a TestGroup (or group has no nested sequence): treat it
+                # as a TestCase. If even that cast fails, log and skip so we
+                # don't silently drop the item.
+                try:
+                    testCase = win32com.client.CastTo(testSequenceItem, "ITestCase")
+                    tc = TestCase(testCase)
+                    test_cases[tc.name] = tc
+                except Exception as e2:
+                    logger.error(
+                        f'Failed to cast test sequence item in module '
+                        f'"{self.name}" to ITestCase: {e2}'
+                    )
+                    continue
         return test_cases
 
     def get_all_test_cases(self) -> dict[str, TestCase]:

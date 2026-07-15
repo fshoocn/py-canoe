@@ -617,10 +617,10 @@ class TestApplyTestCaseSelection:
             cfg._apply_test_case_selection(com, "BLE*", (), match_by="title")
         assert items[0].Enabled is False   # name matches but title does not
 
-    def test_match_by_title_falls_back_to_name_when_no_titles(self):
+    def test_match_by_title_skips_when_no_titles(self):
         """When no test case exposes a Title (e.g. CAPL modules), match_by='title'
-        must fall back to matching by name for the whole module (single warning,
-        not per-case), and still enable cases whose name matches."""
+        must warn once and skip the whole matching loop (no name fallback).
+        No case is enabled and the loop body is never executed."""
         cfg, com, items = self._make_cfg_with_test_cases([
             {"name": "XM_CSflash_FUNC_002", "enabled": False, "title": ""},
             {"name": "XM_CSflash_FUNC_071", "enabled": False, "title": ""},
@@ -629,9 +629,9 @@ class TestApplyTestCaseSelection:
              patch("win32com.client.WithEvents", return_value=MagicMock()), \
              patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             cfg._apply_test_case_selection(com, "XM_CSflash_FUNC_00*", (), match_by="title")
-        # Falls back to name matching, so only the 002 case (name matches) is enabled.
-        assert items[0].Enabled is True    # XM_CSflash_FUNC_002 matches by name
-        assert items[1].Enabled is False   # XM_CSflash_FUNC_071 does not match
+        # Loop skipped entirely: cases keep their original (disabled) state.
+        assert items[0].Enabled is False   # XM_CSflash_FUNC_002 untouched
+        assert items[1].Enabled is False   # XM_CSflash_FUNC_071 untouched
 
 
 # ===========================================================================
@@ -698,9 +698,8 @@ class TestExecuteTestModuleWithPatterns:
         with patch("py_canoe.core.configuration.Configuration._apply_test_case_selection") as mock_apply:
             result = cfg.execute_test_module("TestMod1")
 
-        # start()/verdict are currently commented out in execute_test_module,
-        # so the method returns 0 after applying selection.
-        assert result == 0
+        # execute_test_module now really starts the module and returns its verdict.
+        assert result == 1
         mock_apply.assert_called_once_with(mock_tm, (), (), match_by="name")
 
     def test_execute_with_enable_patterns(self):
@@ -767,10 +766,16 @@ class TestGetTestModuleResult:
         cfg = Configuration.__new__(Configuration)
         tm_wrapper = _make_test_module_wrapper(test_cases)
         tm_wrapper.com_object.Verdict = verdict
+        # get_test_module_result requires the module to be started before it
+        # collects results (it checks TM_STARTED on the TestModule wrapper).
+        tm_wrapper.test_module_events.TM_STARTED = True
+        tm_wrapper.test_module_events.TM_REPORT_GENERATED = True
         if report_info is not None:
             tm_wrapper.test_module_events.TEST_REPORT_INFORMATION = report_info
+        # _find_test_module returns the stored TestModule wrapper (object), which
+        # exposes .verdict, .get_all_test_cases() and .test_module_events.
         cfg._Configuration__test_modules = [
-            {"name": "TestMod1", "object": tm_wrapper.com_object, "environment": "Env1"}
+            {"name": "TestMod1", "object": tm_wrapper, "environment": "Env1"}
         ]
         return cfg, tm_wrapper
 
@@ -779,8 +784,7 @@ class TestGetTestModuleResult:
             {"name": "TC_001", "enabled": True, "verdict": 1, "title": "TC 1"},
         ])
 
-        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
-             patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
+        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm), \
              patch("win32com.client.Dispatch", side_effect=lambda x: x), \
              patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
@@ -793,8 +797,7 @@ class TestGetTestModuleResult:
     def test_result_verdict(self):
         cfg, tm = self._make_cfg_for_result([], verdict=2)
 
-        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
-             patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
+        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm), \
              patch("win32com.client.Dispatch", side_effect=lambda x: x), \
              patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
@@ -809,8 +812,7 @@ class TestGetTestModuleResult:
             "generated_full_name": "C:/test.html"
         })
 
-        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
-             patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
+        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm), \
              patch("win32com.client.Dispatch", side_effect=lambda x: x), \
              patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
@@ -824,19 +826,19 @@ class TestGetTestModuleResult:
             {"name": "TC_001", "enabled": True, "verdict": 1, "title": "Test 1"},
         ])
 
-        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm.com_object), \
-             patch("py_canoe.core.child_elements.test_module.TestModule", return_value=tm), \
+        with patch("py_canoe.core.configuration.Configuration._find_test_module", return_value=tm), \
              patch("win32com.client.Dispatch", side_effect=lambda x: x), \
              patch("win32com.client.CastTo", side_effect=_cast_to_side_effect):
             result = cfg.get_test_module_result("TestMod1")
 
         assert "TC_001" in result["test_cases"]
         tc = result["test_cases"]["TC_001"]
-        assert tc["name"] == "TC_001"
-        assert tc["enabled"] is True
-        assert tc["verdict"] == 1
-        assert tc["verdict_name"] == "Passed"
-        assert tc["title"] == "Test 1"
+        # test_cases holds live TestCase objects (not dicts).
+        assert tc.name == "TC_001"
+        assert tc.enabled is True
+        assert tc.verdict == 1
+        assert tc.verdict_name == "Passed"
+        assert tc.title == "Test 1"
 
     def test_result_not_found_returns_empty(self):
         cfg = Configuration.__new__(Configuration)

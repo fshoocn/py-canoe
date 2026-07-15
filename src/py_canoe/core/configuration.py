@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from py_canoe.core.child_elements.test_configurations import TestConfiguration
 import os
 import re
+import time
 from fnmatch import fnmatchcase
 import win32com.client
 
@@ -461,6 +462,13 @@ class Configuration:
         #   - [...\d...] or [[:alpha:]] → regex (fnmatch doesn't support \d, POSIX classes)
         #   - {3} or {1,3}             → regex quantifier (digits inside braces)
         #   - {foo,bar}                → fnmatch alternation (commas inside braces)
+        #
+        # Why not just try re.search() first and fall back to fnmatch on
+        # re.error? Because an *invalid* regex raises re.error and would fall
+        # back correctly, BUT a *valid* regex that the user actually meant as a
+        # glob (e.g. "TC_[0-9]") would be silently interpreted as regex
+        # and match differently. The heuristic below keeps glob the default
+        # and only escalates to regex when we see unambiguous regex markers.
         is_regex = pattern.startswith('(?')
         if not is_regex:
             # Check for unambiguous regex markers outside bracket context
@@ -530,15 +538,15 @@ class Configuration:
 
         # When matching by title, check up front whether any title is available.
         # Many module types (e.g. CAPL test modules) do not expose a Title at
-        # all. If none of the cases have a title, warn once and fall back to
-        # matching by name for the whole module (avoids per-case log spam).
-        # if match_by == "title":
-        #     if not any(tc.title for tc in all_test_cases.values()):
-        #         logger.warning(
-        #             f'Test module "{tm_obj.name}" has no test case titles '
-        #             f'available; falling back to matching by name.'
-        #         )
-        #         match_by = "name"
+        # all. If no title exists at all, there is nothing to match against,
+        # so warn once and skip the whole matching loop (matching empty
+        # titles would never hit and just wastes a full iteration).
+        if match_by == "title" and not any(tc.title for tc in all_test_cases.values()):
+            logger.warning(
+                f'Test module "{tm_obj.name}" has no test case titles available; '
+                f'title patterns will not match anything, skipping selection.'
+            )
+            return
 
         for tc_name, tc in all_test_cases.items():
             # Match against the requested attribute (name or title).
@@ -602,13 +610,22 @@ class Configuration:
         logger.warning(f'test module "{test_module_name}" not found.')
         return None
 
-    def get_test_module_result(self, test_module_name: str) -> dict:
+    def get_test_module_result(self, test_module_name: str, report_timeout: float = 30.0) -> dict:
         """Get test module execution result including report path and test case verdicts.
 
         Should be called after execute_test_module() to retrieve the results.
 
+        Note: This method does NOT depend on the module's started state. It reads
+        the verdict and report information directly from the test module object,
+        and waits (up to ``report_timeout`` seconds) for the report-generated
+        event if it has not fired yet. The returned ``test_cases`` are live
+        ``TestCase`` objects, so accessing their attributes (e.g. ``verdict``,
+        ``enabled``) reads the latest values from CANoe.
+
         Args:
             test_module_name (str): name of the test module.
+            report_timeout (float): maximum time in seconds to wait for the
+                report-generated event before giving up. Defaults to 30.0.
 
         Returns:
             dict: A dictionary with keys:
@@ -618,41 +635,49 @@ class Configuration:
                     - "success" (bool): whether report generation succeeded
                     - "source_full_name" (str): XML report path
                     - "generated_full_name" (str): HTML report path
-                - "test_cases" (dict[str, dict]): mapping of test case names to dicts
-                  with keys "name", "enabled", "verdict", "verdict_name", "title"
+                - "test_cases" (dict[str, TestCase]): mapping of test case names
+                  to live TestCase objects (use .name/.enabled/.verdict/.title)
         """
         try:
             tm_obj = self._find_test_module(test_module_name)
             if tm_obj is None:
                 return {}
-            
-            if tm_obj.test_module_events.TM_STARTED:
-                while not tm_obj.test_module_events.TM_REPORT_GENERATED:
-                    wait(0.01)
-                    
-                # overall verdict
-                verdict = tm_obj.verdict
-                verdict_name = tm_obj.VALUE_TABLE_VERDICT.get(verdict, "Unknown")
 
-                # report information from event sink
-                report_info = tm_obj.test_module_events.TEST_REPORT_INFORMATION
-                report = {
-                    "success": report_info.get("success", False),
-                    "source_full_name": report_info.get("source_full_name", ""),
-                    "generated_full_name": report_info.get("generated_full_name", ""),
-                }
+            # Wait for the report-generated event (bounded by report_timeout) so
+            # the report paths are populated. If it already fired, this returns
+            # immediately. We do NOT gate on TM_STARTED, because the module may
+            # have been stopped (which resets TM_STARTED) by the time results
+            # are requested. Use a monotonic clock so the wait is not
+            # skewed by GIL/thread scheduling.
+            deadline = time.monotonic() + report_timeout
+            while not tm_obj.test_module_events.TM_REPORT_GENERATED and time.monotonic() < deadline:
+                wait(0.01)
+            if not tm_obj.test_module_events.TM_REPORT_GENERATED:
+                logger.warning(
+                    f'Test module "{test_module_name}" report was not generated '
+                    f'within {report_timeout}s; report paths may be empty.'
+                )
 
-                test_cases = tm_obj.get_all_test_cases()
+            # overall verdict
+            verdict = tm_obj.verdict
+            verdict_name = tm_obj.VALUE_TABLE_VERDICT.get(verdict, "Unknown")
 
-                return {
-                    "verdict": verdict,
-                    "verdict_name": verdict_name,
-                    "report": report,
-                    "test_cases": test_cases
-                }
-            else:
-                logger.warning(f'Test Module ({self.name}) is not started. Start the Test Module first.')
-                return {}
+            # report information from event sink
+            report_info = tm_obj.test_module_events.TEST_REPORT_INFORMATION
+            report = {
+                "success": report_info.get("success", False),
+                "source_full_name": report_info.get("source_full_name", ""),
+                "generated_full_name": report_info.get("generated_full_name", ""),
+            }
+
+            test_cases = tm_obj.get_all_test_cases()
+
+            return {
+                "verdict": verdict,
+                "verdict_name": verdict_name,
+                "report": report,
+                "test_cases": test_cases
+            }
 
         except Exception as e:
             logger.error(f'failed to get test module result for "{test_module_name}": {e}')
@@ -667,12 +692,17 @@ class Configuration:
         except Exception as e:
             logger.error(f'failed to stop test module. {e}')
 
-    def execute_all_test_modules_in_test_env(self, env_name: str):
+    def execute_all_test_modules_in_test_env(self, env_name: str, enable_test_cases: Sequence[str] = (), disable_test_cases: Sequence[str] = (), match_by: str = "name"):
         try:
             test_modules = self.get_test_modules(env_name=env_name)
             if test_modules:
                 for tm_name in test_modules.keys():
-                    self.execute_test_module(tm_name)
+                    self.execute_test_module(
+                        tm_name,
+                        enable_test_cases=enable_test_cases,
+                        disable_test_cases=disable_test_cases,
+                        match_by=match_by,
+                    )
             else:
                 logger.warning(f'test modules not available in "{env_name}" test environment')
         except Exception as e:
