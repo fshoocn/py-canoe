@@ -746,26 +746,40 @@ class Configuration:
             logger.error(f'failed to stop all test environments. {e}')
 
     def add_database(self, database_file: str, database_channel: int, database_network: Union[str, None]=None) -> bool:
+        """
+        添加db文件到指定通道
+
+        注意：
+            * database_network 应该是CANoe工程中不存在的网络名字，否则会报错
+            * 给指定channel添加dbc文件时，应该使用 database_file + database_channel参数来指定，否则会添加到所有网络中
+
+        Args:
+            database_file: db文件地址
+            database_channel: db文件要绑定的通道
+            database_network: 要添加的网络
+
+        Returns:
+            bool: True 表示成功，False 表示失败
+        """
         try:
             if self.app.measurement.running:
                 logger.warning("Cannot add database while measurement is running. Please stop the measurement first.")
                 return False
             else:
                 databases = Databases(self.com_object.GeneralSetup.DatabaseSetup.Databases)
-                databases_info = {databases.item(index).full_name: databases.item(index) for index in range(1, databases.count + 1)}
-                if database_file in databases_info.keys():
-                    logger.warning(f'database "{database_file}" already added')
-                    return False
+                for db in databases.item():
+                    db:Database
+                    if db.channel == database_channel and db.full_name == database_file:
+                        logger.warning(f'database "{database_file}" already added')
+                        return False
+                if database_network:
+                    database = databases.add_network(database_file, database_network)
                 else:
-                    if database_network:
-                        database = databases.add_network(database_file, database_network)
-                    else:
-                        database = databases.add(database_file)
+                    database = databases.add(database_file)
                     wait(0.5)
                     database.channel = database_channel
-                    wait(0.5)
-                    logger.info(f'database "{database_file}" added successfully to channel {database_channel}')
-                    return True
+                logger.info(f'database "{database_file}" added successfully to channel {database_channel}')
+                return True
         except Exception as e:
             logger.error(f"Error adding database '{database_file}': {e}")
             return False
