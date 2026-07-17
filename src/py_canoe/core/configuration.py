@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Iterable, Sequence, Union
 
+from py_canoe.core.child_elements.test_environment import TestEnvironment
 from py_canoe.core.child_elements.test_module import TestModule
 if TYPE_CHECKING:
     from py_canoe.core.application import Application
@@ -17,7 +18,7 @@ from py_canoe.core.child_elements.distributed_mode import DistributedMode
 from py_canoe.core.child_elements.fdx_files import FDXFiles
 from py_canoe.core.child_elements.general_setup import GeneralSetup
 from py_canoe.core.child_elements.measurement_setup import MeasurementSetup
-from py_canoe.core.child_elements.database_setup import Databases
+from py_canoe.core.child_elements.database_setup import Databases,Database
 from py_canoe.core.child_elements.replay_collection import ReplayCollection
 from py_canoe.core.child_elements.simulation_setup import SimulationSetup
 from py_canoe.core.child_elements.test_configurations import TestConfigurations
@@ -784,7 +785,7 @@ class Configuration:
             logger.error(f"Error adding database '{database_file}': {e}")
             return False
 
-    def remove_database(self, database_file: str, database_channel: int) -> bool:
+    def remove_database(self, database_file: str, database_channel: int = -1) -> bool:
         try:
             if self.app.measurement.running:
                 logger.warning("Cannot remove database while measurement is running. Please stop the measurement first.")
@@ -808,6 +809,14 @@ class Configuration:
         except Exception as e:
             logger.error(f"Error removing database '{database_file}': {e}")
             return False
+
+    def add_testEnvironments(self, name:str) -> TestEnvironment:
+        te = self.test_setup.test_environments.add(name)
+        if te is None:
+            logger.warning(f"TestEnvironment {name} already exists.")
+        else:
+            logger.info(f"add TestEnvironment: {name}")
+        return te
 
     def get_mode(self) -> int:
         logger.info(f"CANoe Configuration mode = ({self.mode} - {'Offline mode' if self.mode == 1 else 'Online mode'})")

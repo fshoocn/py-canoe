@@ -1,4 +1,7 @@
 from typing import TYPE_CHECKING, Iterable, Optional, Sequence
+
+from py_canoe.core.child_elements.channel import Channel
+from py_canoe.core.child_elements.test_environment import TestEnvironment
 if TYPE_CHECKING:
     from py_canoe.core.child_elements.measurement_setup import Logging, ExporterSymbol, Message
     from py_canoe.core.child_elements.test_configurations import TestConfiguration
@@ -686,6 +689,17 @@ class CANoe:
             database_channel (int): channel name on which you want to remove database.
         """
         return self.application.configuration.remove_database(database_file, database_channel)
+
+    def add_testEnvironments(self, name:str) -> TestEnvironment:
+        """在TestSetup里面添加一个新的Test Environment
+
+        如果需要创建一个新的测试环境，则 name 字段包含新测试环境的名称。
+        如果需要从文件中读取一个现有的测试环境，则 name 字段包含该文件的路径，路径可以是绝对路径，也可以是相对于当前配置的相对路径。
+
+        Args:
+            name(str): Test Environment的名字或路径
+        """
+        return self.application.configuration.add_testEnvironments(name)
 
     def get_logging_blocks(self) -> list['Logging']:
         """Return all available logging blocks."""
