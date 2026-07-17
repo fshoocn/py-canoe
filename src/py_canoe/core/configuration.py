@@ -61,7 +61,7 @@ class Configuration:
         for te_name, te_inst in self.__test_setup_environments.items():
             for tm_name, tm_inst in te_inst.get_all_test_modules().items():
                 # A TestSetupItem object that either can be a TSTestModule object or a TestSetupFolder object.
-                # TestSetupFolder有items，包含TestSetupItems
+                # A TestSetupFolder has items that contain nested TestSetupItems.
                 self.__test_modules.append({'name': tm_name, 'object': tm_inst, 'environment': te_name})
 
     def fetch_test_units(self):
@@ -554,7 +554,6 @@ class Configuration:
 
         for tc_name, tc in all_test_cases.items():
             # Match against the requested attribute (name or title).
-            # print(f"Checking test case: {tc_name}, title: {tc.title}, ident: {tc.ident}, enabled: {tc.enabled}, verdict: {tc.verdict_name}")
             match_value = tc.title if match_by == "title" else tc.name
             should_enable = False
             should_disable = False

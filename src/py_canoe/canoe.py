@@ -602,13 +602,22 @@ class CANoe:
         """
         return self.application.configuration.execute_test_module(test_module_name, enable_test_cases, disable_test_cases, match_by=match_by)
 
-    def get_test_module_result(self, test_module_name: str) -> dict:
+    def get_test_module_result(self, test_module_name: str, report_timeout: float = 30.0) -> dict:
         """Get test module execution result including report path and test case verdicts.
 
         Should be called after execute_test_module() to retrieve the results.
 
+        Note: This method does NOT depend on the module's started state. It reads
+        the verdict and report information directly from the test module object,
+        and waits (up to ``report_timeout`` seconds) for the report-generated
+        event if it has not fired yet. The returned ``test_cases`` are live
+        ``TestCase`` objects, so accessing their attributes (e.g. ``verdict``,
+        ``enabled``) reads the latest values from CANoe.
+
         Args:
             test_module_name (str): test module name.
+            report_timeout (float): maximum time in seconds to wait for the
+                report-generated event before giving up. Defaults to 30.0.
 
         Returns:
             dict: A dictionary with keys:
@@ -618,8 +627,8 @@ class CANoe:
                     - "success" (bool): whether report generation succeeded
                     - "source_full_name" (str): XML report path
                     - "generated_full_name" (str): HTML report path
-                - "test_cases" (dict[str, dict]): mapping of test case names to dicts
-                  with keys "name", "enabled", "verdict", "verdict_name", "title"
+                - "test_cases" (dict[str, TestCase]): mapping of test case names
+                  to live TestCase objects (use .name/.enabled/.verdict/.title)
 
         Example:
             >>> canoe.execute_test_module("MyModule")
@@ -627,9 +636,9 @@ class CANoe:
             >>> print(f"Verdict: {result['verdict_name']}")
             >>> print(f"Report: {result['report']['generated_full_name']}")
             >>> for name, tc in result['test_cases'].items():
-            ...     print(f"  {name}: {tc['verdict_name']}")
+            ...     print(f"  {name}: {tc.verdict_name}")
         """
-        return self.application.configuration.get_test_module_result(test_module_name)
+        return self.application.configuration.get_test_module_result(test_module_name, report_timeout=report_timeout)
 
     def stop_test_module(self, test_module_name: str):
         """stops execution of test module.
