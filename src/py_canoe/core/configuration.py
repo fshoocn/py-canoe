@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Iterable, Sequence, Union
 
+from py_canoe.core.bus import Bus
 from py_canoe.core.child_elements.test_environment import TestEnvironment
 from py_canoe.core.child_elements.test_module import TestModule
 if TYPE_CHECKING:
@@ -817,6 +818,22 @@ class Configuration:
         else:
             logger.info(f"add TestEnvironment: {name}")
         return te
+
+    def add_NetWork(self, network_name: str, network_type: int = 1) -> Bus:
+        """adds a new network to the configuration. defaults to CAN (1) if no type is specified.
+        
+        Args:
+            network_name (str): name of the new network.
+            network_type (int): type of the new network (1 for CAN, 5 for LIN, 6 for MOST, 7 for FlexRay, 9 for J1708, 11 for Ethernet, 13 for WLAN). Defaults to 1 (CAN).
+        """
+        if network_type not in [1, 5, 6, 7, 9, 11, 13]:
+            logger.warning(f"Invalid network type {network_type}.")
+            return None
+        bus = self.simulation_setup.buses.add(network_name, network_type)
+        if bus is None:
+            logger.warning(f"Network {network_name} already exists.")
+            return None
+        return bus
 
     def get_mode(self) -> int:
         logger.info(f"CANoe Configuration mode = ({self.mode} - {'Offline mode' if self.mode == 1 else 'Online mode'})")

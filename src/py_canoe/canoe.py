@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Iterable, Optional, Sequence
 
+from py_canoe.core.bus import Bus
 from py_canoe.core.child_elements.channel import Channel
 from py_canoe.core.child_elements.test_environment import TestEnvironment
 if TYPE_CHECKING:
@@ -700,6 +701,15 @@ class CANoe:
             name(str): Test Environment的名字或路径
         """
         return self.application.configuration.add_testEnvironments(name)
+    
+    def add_NetWork(self, network_name: str, network_type: int = 1) -> Bus:
+        """adds a new network to the configuration.
+        
+        Args:
+            network_name (str): name of the new network.
+            network_type (str): type of the new network (1 for CAN, 5 for LIN, 6 for MOST, 7 for FlexRay, 9 for J1708, 11 for Ethernet, 13 for WLAN). Defaults to 1 (CAN).
+        """
+        return self.application.configuration.add_NetWork(network_name, network_type)
 
     def get_logging_blocks(self) -> list['Logging']:
         """Return all available logging blocks."""
