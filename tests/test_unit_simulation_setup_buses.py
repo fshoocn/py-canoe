@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from py_canoe.exceptions import ConfigurationNotLoadedError
+from py_canoe.helpers.exceptions import ConfigurationNotLoadedError
 from py_canoe.core.child_elements.simulation_setup import SimulationSetup
 from py_canoe.core.child_elements.buses import Buses
 from py_canoe.core.child_elements.bus import Bus

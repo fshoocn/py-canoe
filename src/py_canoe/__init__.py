@@ -1,7 +1,7 @@
 from py_canoe.canoe import CANoe as CANoe
 from py_canoe.helpers.common import wait as wait
-from py_canoe.exceptions import PyCanoeError as PyCanoeError
-from py_canoe.exceptions import ConfigurationNotLoadedError as ConfigurationNotLoadedError
+from py_canoe.helpers.exceptions import PyCanoeError as PyCanoeError
+from py_canoe.helpers.exceptions import ConfigurationNotLoadedError as ConfigurationNotLoadedError
 
 
 sample_py_canoe_script = '''
@@ -60,5 +60,5 @@ def main():
         return
 
     if not args.quiet:
-        print(f"py-canoe {v} — paddling through the CAN bus, one frame at a time.")
+        print(f"py-canoe {v} — paddling through CANoe, one test at a time.")
         print("Run `py-canoe --help` to see available options.\n")

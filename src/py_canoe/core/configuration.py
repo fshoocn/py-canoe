@@ -1,7 +1,9 @@
-from typing import TYPE_CHECKING, Iterable, Sequence, Union
+from typing import TYPE_CHECKING, Iterable, Sequence, Sequence, Union
 
 from py_canoe.core.bus import Bus
 from py_canoe.core.child_elements.test_environment import TestEnvironment
+from py_canoe.core.child_elements.test_module import TestModule
+
 from py_canoe.core.child_elements.test_module import TestModule
 if TYPE_CHECKING:
     from py_canoe.core.application import Application

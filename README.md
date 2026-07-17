@@ -1,6 +1,6 @@
 # [py-canoe](https://github.com/chaitu-ycr/py-canoe)
 
-> 🇨🇳 [中文文档 / Chinese Documentation](README_CN.md)
+> 🇨🇳 [中文文档 / Chinese Documentation](https://github.com/chaitu-ycr/py-canoe/blob/main/README_CN.md)
 
 ## about package
 
